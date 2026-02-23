@@ -1,4 +1,5 @@
 import { useSceneStore, type GeometryType } from "../store/scene";
+import { cameraStateRef } from "./Canvas3D";
 import { glassHeroTemplate } from "../templates/glass-hero";
 import { epicHeroTemplate, epicHeroEnvironment } from "../templates/epic-hero";
 
@@ -13,6 +14,17 @@ const primitives: { type: GeometryType; label: string; icon: string }[] = [
 
 const environments = ["city", "studio", "sunset", "dawn", "night", "forest", "apartment", "lobby", "park", "warehouse"];
 
+const bgPresets = [
+  { label: "Negro", color: "#000000" },
+  { label: "Oscuro", color: "#0a0a0a" },
+  { label: "Zinc", color: "#18181b" },
+  { label: "Slate", color: "#0f172a" },
+  { label: "Navy", color: "#0c1445" },
+  { label: "Violeta", color: "#1e1040" },
+  { label: "Blanco", color: "#ffffff" },
+  { label: "Crema", color: "#faf5ee" },
+];
+
 export function Sidebar() {
   const addObject = useSceneStore((s) => s.addObject);
   const objects = useSceneStore((s) => s.objects);
@@ -21,9 +33,19 @@ export function Sidebar() {
   const removeObject = useSceneStore((s) => s.removeObject);
   const environment = useSceneStore((s) => s.environment);
   const setEnvironment = useSceneStore((s) => s.setEnvironment);
+  const bgColor = useSceneStore((s) => s.bgColor);
+  const setBgColor = useSceneStore((s) => s.setBgColor);
   const transformMode = useSceneStore((s) => s.transformMode);
   const setTransformMode = useSceneStore((s) => s.setTransformMode);
   const loadTemplate = useSceneStore((s) => s.loadTemplate);
+  const slides = useSceneStore((s) => s.slides);
+  const activeSlideId = useSceneStore((s) => s.activeSlideId);
+  const addSlide = useSceneStore((s) => s.addSlide);
+  const removeSlide = useSceneStore((s) => s.removeSlide);
+  const updateSlide = useSceneStore((s) => s.updateSlide);
+  const reorderSlides = useSceneStore((s) => s.reorderSlides);
+  const setActiveSlide = useSceneStore((s) => s.setActiveSlide);
+  const flyToSlide = useSceneStore((s) => s.flyToSlide);
 
   return (
     <div className="w-56 bg-zinc-900 border-r border-zinc-800 flex flex-col h-full overflow-hidden">
@@ -84,6 +106,24 @@ export function Sidebar() {
         </select>
       </div>
 
+      {/* Background */}
+      <div className="p-3 border-b border-zinc-800">
+        <h3 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">Fondo</h3>
+        <div className="flex gap-1.5 flex-wrap">
+          {bgPresets.map((p) => (
+            <button
+              key={p.color}
+              onClick={() => setBgColor(p.color)}
+              className={`w-6 h-6 rounded-full border-2 transition-colors ${
+                bgColor === p.color ? "border-violet-500" : "border-zinc-700 hover:border-zinc-500"
+              }`}
+              style={{ backgroundColor: p.color }}
+              title={p.label}
+            />
+          ))}
+        </div>
+      </div>
+
       {/* Templates */}
       <div className="p-3 border-b border-zinc-800 space-y-1.5">
         <h3 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">Templates</h3>
@@ -102,6 +142,72 @@ export function Sidebar() {
         >
           Epic Hero
         </button>
+      </div>
+
+      {/* Slides */}
+      <div className="p-3 border-b border-zinc-800">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Slides</h3>
+          <button
+            onClick={() => {
+              const { position, target } = cameraStateRef.current;
+              console.log('[addSlide] pos:', [...position], 'target:', [...target]);
+              addSlide([...position], [...target]);
+            }}
+            className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded"
+          >
+            + Slide
+          </button>
+        </div>
+        {slides.length === 0 && (
+          <p className="text-xs text-zinc-600 italic">Mueve la cámara y agrega slides</p>
+        )}
+        <div className="space-y-0.5">
+          {slides.map((slide, i) => (
+            <div
+              key={slide.id}
+              onClick={() => flyToSlide(slide.id)}
+              className={`flex items-center justify-between px-2 py-1.5 rounded-md text-sm cursor-pointer group ${
+                activeSlideId === slide.id
+                  ? "bg-violet-600/20 text-violet-300"
+                  : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] text-zinc-500 w-4">{i + 1}</span>
+                <span className="truncate">{slide.name}</span>
+              </div>
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const { position, target } = cameraStateRef.current;
+                    updateSlide(slide.id, { cameraPosition: [...position], cameraTarget: [...target] });
+                    console.log('[updateSlide]', slide.name, 'pos:', [...position], 'target:', [...target]);
+                  }}
+                  className="text-zinc-500 hover:text-violet-400 text-xs px-0.5"
+                  title="Actualizar cámara del slide"
+                >📷</button>
+                {i > 0 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); reorderSlides(i, i - 1); }}
+                    className="text-zinc-500 hover:text-white text-xs px-0.5"
+                  >↑</button>
+                )}
+                {i < slides.length - 1 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); reorderSlides(i, i + 1); }}
+                    className="text-zinc-500 hover:text-white text-xs px-0.5"
+                  >↓</button>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeSlide(slide.id); }}
+                  className="text-zinc-500 hover:text-red-400 text-xs px-0.5"
+                >✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Scene graph */}

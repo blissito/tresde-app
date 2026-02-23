@@ -1,4 +1,4 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import {
   OrbitControls,
   Grid,
@@ -9,8 +9,91 @@ import {
 } from "@react-three/drei";
 import { useSceneStore, type GeometryType } from "../store/scene";
 import { SceneObject } from "./SceneObject";
-import { useRef, useState, useCallback } from "react";
+import { ScrollScene } from "./ScrollScene";
+import { useRef, useState, useCallback, useEffect } from "react";
 import * as THREE from "three";
+
+// Global ref to read camera state from outside R3F
+export const cameraStateRef: { current: { position: [number, number, number]; target: [number, number, number] } } = {
+  current: { position: [5, 4, 5], target: [0, 0, 0] },
+};
+
+// Ref shared between OrbitControls and CameraTracker
+export const orbitControlsRef = { current: null as any };
+
+function CameraController() {
+  const flyToSlideId = useSceneStore((s) => s.flyToSlideId);
+  const clearFlyTo = useSceneStore((s) => s.clearFlyTo);
+  const slides = useSceneStore((s) => s.slides);
+  const mode = useRef<'orbit' | 'flying'>('orbit');
+  const targetPos = useRef(new THREE.Vector3());
+  const targetLook = useRef(new THREE.Vector3());
+  // Reusable vectors to avoid allocations in useFrame
+  const _dir = useRef(new THREE.Vector3());
+  const _lookAt = useRef(new THREE.Vector3());
+
+  // Start flying when a slide is clicked
+  useEffect(() => {
+    if (flyToSlideId) {
+      const slide = slides.find((s) => s.id === flyToSlideId);
+      if (slide) {
+        targetPos.current.set(...slide.cameraPosition);
+        targetLook.current.set(...slide.cameraTarget);
+        const ctrl = orbitControlsRef.current;
+        if (ctrl) ctrl.enabled = false;
+        mode.current = 'flying';
+      }
+      clearFlyTo();
+    }
+  }, [flyToSlideId, slides, clearFlyTo]);
+
+  useFrame((state) => {
+    // Grab controls ref once available
+    if (!orbitControlsRef.current && state.controls) {
+      orbitControlsRef.current = state.controls;
+    }
+
+    const { camera } = state;
+    const ctrl = orbitControlsRef.current;
+
+    if (mode.current === 'flying') {
+      // Lerp position and target WITHOUT calling ctrl.update()
+      camera.position.lerp(targetPos.current, 0.08);
+      if (ctrl?.target) {
+        ctrl.target.lerp(targetLook.current, 0.08);
+      }
+      // Make camera look at the interpolated target
+      camera.lookAt(ctrl?.target ?? targetLook.current);
+
+      const dist = camera.position.distanceTo(targetPos.current);
+      if (dist < 0.01) {
+        // Snap to final values
+        camera.position.copy(targetPos.current);
+        if (ctrl?.target) {
+          ctrl.target.copy(targetLook.current);
+        }
+        // Re-enable orbit and sync its internal spherical state once
+        if (ctrl) {
+          ctrl.enabled = true;
+          ctrl.update();
+        }
+        mode.current = 'orbit';
+      }
+    }
+
+    // Always track camera state for slide captures
+    cameraStateRef.current.position = [camera.position.x, camera.position.y, camera.position.z];
+    // Compute look-at point from camera forward direction * distance to ctrl.target
+    // This ensures the saved target always reflects where the camera looks,
+    // even when the user only rotates without panning.
+    camera.getWorldDirection(_dir.current);
+    const dist = ctrl?.target ? camera.position.distanceTo(ctrl.target) : 5;
+    _lookAt.current.copy(camera.position).add(_dir.current.multiplyScalar(dist));
+    cameraStateRef.current.target = [_lookAt.current.x, _lookAt.current.y, _lookAt.current.z];
+  });
+
+  return null;
+}
 
 function DropPlane() {
   return (
@@ -21,9 +104,12 @@ function DropPlane() {
   );
 }
 
-function Scene({ embed }: { embed?: boolean }) {
+function Scene({ embed, onSlideChange }: { embed?: boolean; onSlideChange?: (index: number) => void }) {
   const objects = useSceneStore((s) => s.objects);
   const environment = useSceneStore((s) => s.environment);
+  const bgColor = useSceneStore((s) => s.bgColor);
+  const slides = useSceneStore((s) => s.slides);
+  const useScrollMode = embed && slides.length >= 2;
 
   return (
     <>
@@ -32,7 +118,7 @@ function Scene({ embed }: { embed?: boolean }) {
         background={!embed}
         blur={0.5}
       />
-      {embed && <color attach="background" args={["#000000"]} />}
+      {embed && <color attach="background" args={[bgColor]} />}
 
       <ambientLight intensity={embed ? 0.15 : 0.3} />
       <directionalLight
@@ -80,14 +166,26 @@ function Scene({ embed }: { embed?: boolean }) {
       )}
 
       <DropPlane />
-      <OrbitControls makeDefault enableZoom={!embed} enablePan={!embed} />
+
+      {!useScrollMode && (
+        <OrbitControls makeDefault enableZoom={!embed} enablePan={!embed} />
+      )}
+
+      {useScrollMode && <ScrollScene slides={slides} onSlideChange={onSlideChange} />}
+
+      {!embed && <CameraController />}
     </>
   );
 }
 
-export function Canvas3D({ embed }: { embed?: boolean }) {
+// Shared scroll offset for wheel-driven camera animation
+export const scrollOffsetRef = { current: 0 };
+
+export function Canvas3D({ embed, onSlideChange }: { embed?: boolean; onSlideChange?: (index: number) => void }) {
   const selectObject = useSceneStore((s) => s.selectObject);
   const addObject = useSceneStore((s) => s.addObject);
+  const slides = useSceneStore((s) => s.slides);
+  const useScrollMode = embed && slides.length >= 2;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -147,8 +245,28 @@ export function Canvas3D({ embed }: { embed?: boolean }) {
     [addObject]
   );
 
+  // Wheel-driven scroll for embed mode (non-passive to allow preventDefault)
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!useScrollMode) return;
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const pages = slides.length;
+      const delta = e.deltaY / (window.innerHeight * pages);
+      scrollOffsetRef.current = Math.max(0, Math.min(1, scrollOffsetRef.current + delta));
+    };
+
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [useScrollMode, slides.length]);
+
   return (
     <div
+      ref={wrapperRef}
       className="absolute inset-0"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -167,7 +285,7 @@ export function Canvas3D({ embed }: { embed?: boolean }) {
         onPointerMissed={() => !embed && selectObject(null)}
         className="!absolute inset-0"
       >
-        <Scene embed={embed} />
+        <Scene embed={embed} onSlideChange={onSlideChange} />
       </Canvas>
     </div>
   );

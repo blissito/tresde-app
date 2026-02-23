@@ -16,6 +16,15 @@ export type MaterialType =
 
 export type AnimationType = "none" | "float" | "rotate";
 
+export interface Slide {
+  id: string;
+  name: string;
+  cameraPosition: [number, number, number];
+  cameraTarget: [number, number, number];
+  text?: string;
+  duration: number;
+}
+
 export interface SceneObject {
   id: string;
   name: string;
@@ -35,13 +44,24 @@ export interface SceneObject {
   // distort material
   distort?: number;
   speed?: number;
+  // hover interactions
+  hoverGroup?: string;
+  hoverPosition?: [number, number, number];
+  hoverRotation?: [number, number, number];
+  hoverScale?: [number, number, number];
+  hoverColor?: string;
 }
 
 interface SceneState {
   objects: SceneObject[];
   selectedId: string | null;
   environment: string;
+  bgColor: string;
   transformMode: "translate" | "rotate" | "scale";
+  setBgColor: (color: string) => void;
+  slides: Slide[];
+  activeSlideId: string | null;
+  flyToSlideId: string | null;
   addObject: (geometry: GeometryType, position?: [number, number, number]) => void;
   removeObject: (id: string) => void;
   selectObject: (id: string | null) => void;
@@ -49,9 +69,19 @@ interface SceneState {
   setEnvironment: (env: string) => void;
   setTransformMode: (mode: "translate" | "rotate" | "scale") => void;
   loadTemplate: (template: Omit<SceneObject, "id">[]) => void;
+  addSlide: (cameraPosition: [number, number, number], cameraTarget: [number, number, number]) => void;
+  removeSlide: (id: string) => void;
+  updateSlide: (id: string, updates: Partial<Slide>) => void;
+  reorderSlides: (fromIndex: number, toIndex: number) => void;
+  setActiveSlide: (id: string | null) => void;
+  flyToSlide: (id: string) => void;
+  clearFlyTo: () => void;
+  hoveredGroup: string | null;
+  setHoveredGroup: (group: string | null) => void;
 }
 
 let counter = 0;
+let slideCounter = 0;
 const names: Record<GeometryType, string> = {
   box: "Cubo",
   sphere: "Esfera",
@@ -94,7 +124,11 @@ export const useSceneStore = create<SceneState>((set) => ({
   ],
   selectedId: null,
   environment: "city",
+  bgColor: "#000000",
   transformMode: "translate",
+  slides: [],
+  activeSlideId: null,
+  flyToSlideId: null,
 
   addObject: (geometry, position?) => {
     const id = `obj-${++counter}`;
@@ -133,6 +167,7 @@ export const useSceneStore = create<SceneState>((set) => ({
     })),
 
   setEnvironment: (environment) => set({ environment }),
+  setBgColor: (bgColor) => set({ bgColor }),
   setTransformMode: (transformMode) => set({ transformMode }),
 
   loadTemplate: (template) => {
@@ -142,4 +177,41 @@ export const useSceneStore = create<SceneState>((set) => ({
     }));
     set({ objects: newObjects, selectedId: null });
   },
+
+  addSlide: (cameraPosition, cameraTarget) => {
+    const id = `slide-${++slideCounter}`;
+    const slide: Slide = {
+      id,
+      name: `Slide ${slideCounter}`,
+      cameraPosition,
+      cameraTarget,
+      duration: 1,
+    };
+    set((s) => ({ slides: [...s.slides, slide], activeSlideId: id }));
+  },
+
+  removeSlide: (id) =>
+    set((s) => ({
+      slides: s.slides.filter((sl) => sl.id !== id),
+      activeSlideId: s.activeSlideId === id ? null : s.activeSlideId,
+    })),
+
+  updateSlide: (id, updates) =>
+    set((s) => ({
+      slides: s.slides.map((sl) => (sl.id === id ? { ...sl, ...updates } : sl)),
+    })),
+
+  reorderSlides: (fromIndex, toIndex) =>
+    set((s) => {
+      const slides = [...s.slides];
+      const [moved] = slides.splice(fromIndex, 1);
+      slides.splice(toIndex, 0, moved);
+      return { slides };
+    }),
+
+  setActiveSlide: (id) => set({ activeSlideId: id }),
+  flyToSlide: (id) => set({ flyToSlideId: id, activeSlideId: id }),
+  clearFlyTo: () => set({ flyToSlideId: null }),
+  hoveredGroup: null,
+  setHoveredGroup: (group) => set({ hoveredGroup: group }),
 }));

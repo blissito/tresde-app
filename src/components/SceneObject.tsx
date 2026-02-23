@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
   TransformControls,
@@ -16,8 +16,9 @@ import * as THREE from "three";
 
 const _targetRotX = { current: 0 };
 const _targetRotY = { current: 0 };
-const FOLLOW_INTENSITY = 0.15; // máxima rotación en radianes (~8.5°)
-const FOLLOW_LERP = 0.05; // suavidad del seguimiento
+const FOLLOW_INTENSITY = 0.15;
+const FOLLOW_LERP = 0.05;
+const HOVER_LERP = 0.08;
 
 function GeometryMesh({ obj }: { obj: SceneObjectType }) {
   switch (obj.geometry) {
@@ -34,11 +35,12 @@ function GeometryMesh({ obj }: { obj: SceneObjectType }) {
   }
 }
 
-function MaterialComp({ obj }: { obj: SceneObjectType }) {
+function MaterialComp({ obj, materialRef }: { obj: SceneObjectType; materialRef?: React.RefObject<THREE.Material | null> }) {
   switch (obj.material) {
     case "transmission":
       return (
         <MeshTransmissionMaterial
+          ref={materialRef as any}
           color={obj.color}
           transmission={obj.transmission ?? 0.9}
           thickness={obj.thickness ?? 0.5}
@@ -50,6 +52,7 @@ function MaterialComp({ obj }: { obj: SceneObjectType }) {
     case "distort":
       return (
         <MeshDistortMaterial
+          ref={materialRef as any}
           color={obj.color}
           metalness={obj.metalness}
           roughness={obj.roughness}
@@ -60,6 +63,7 @@ function MaterialComp({ obj }: { obj: SceneObjectType }) {
     case "wobble":
       return (
         <MeshWobbleMaterial
+          ref={materialRef as any}
           color={obj.color}
           metalness={obj.metalness}
           roughness={obj.roughness}
@@ -70,6 +74,7 @@ function MaterialComp({ obj }: { obj: SceneObjectType }) {
     default:
       return (
         <meshStandardMaterial
+          ref={materialRef as any}
           color={obj.color}
           metalness={obj.metalness}
           roughness={obj.roughness}
@@ -78,7 +83,7 @@ function MaterialComp({ obj }: { obj: SceneObjectType }) {
   }
 }
 
-function ObjectMesh({ obj }: { obj: SceneObjectType }) {
+function ObjectMesh({ obj, materialRef }: { obj: SceneObjectType; materialRef?: React.RefObject<THREE.Material | null> }) {
   const ref = useRef<THREE.Mesh>(null!);
 
   useFrame((_, delta) => {
@@ -90,7 +95,7 @@ function ObjectMesh({ obj }: { obj: SceneObjectType }) {
   if (obj.geometry === "roundedBox") {
     return (
       <RoundedBox ref={ref} args={[1, 1, 1]} radius={0.1} smoothness={4}>
-        <MaterialComp obj={obj} />
+        <MaterialComp obj={obj} materialRef={materialRef} />
       </RoundedBox>
     );
   }
@@ -105,7 +110,7 @@ function ObjectMesh({ obj }: { obj: SceneObjectType }) {
           curveSegments={12}
         >
           {obj.text || "Hola"}
-          <MaterialComp obj={obj} />
+          <MaterialComp obj={obj} materialRef={materialRef} />
         </Text3D>
       </Center>
     );
@@ -114,56 +119,127 @@ function ObjectMesh({ obj }: { obj: SceneObjectType }) {
   return (
     <mesh ref={ref} castShadow receiveShadow>
       <GeometryMesh obj={obj} />
-      <MaterialComp obj={obj} />
+      <MaterialComp obj={obj} materialRef={materialRef} />
     </mesh>
   );
 }
 
-/** Hook que trackea el mouse normalizado (-1 a 1) y lo convierte en rotación target */
 function useMouseFollow(embed?: boolean) {
   const { pointer } = useThree();
 
   useFrame(() => {
     if (!embed) return;
-    // pointer.x y pointer.y van de -1 a 1
     _targetRotY.current = pointer.x * FOLLOW_INTENSITY;
     _targetRotX.current = -pointer.y * FOLLOW_INTENSITY;
   });
 }
+
+const hasHoverConfig = (obj: SceneObjectType) =>
+  obj.hoverPosition || obj.hoverRotation || obj.hoverScale || obj.hoverColor;
 
 export function SceneObject({ obj, embed }: { obj: SceneObjectType; embed?: boolean }) {
   const selectedId = useSceneStore((s) => s.selectedId);
   const selectObject = useSceneStore((s) => s.selectObject);
   const updateObject = useSceneStore((s) => s.updateObject);
   const transformMode = useSceneStore((s) => s.transformMode);
+  const hoveredGroup = useSceneStore((s) => s.hoveredGroup);
+  const setHoveredGroup = useSceneStore((s) => s.setHoveredGroup);
   const groupRef = useRef<THREE.Group>(null!);
   const followRef = useRef<THREE.Group>(null!);
+  const materialRef = useRef<THREE.Material>(null);
   const isSelected = !embed && selectedId === obj.id;
+  const [localHover, setLocalHover] = useState(false);
 
-  // Actualiza target del mouse (solo corre en el primer SceneObject, los demás leen el valor)
+  const isHovered = embed && hasHoverConfig(obj) && (
+    localHover ||
+    (obj.hoverGroup ? hoveredGroup === obj.hoverGroup : false)
+  );
+
+  // Color lerp refs
+  const baseColor = useRef(new THREE.Color());
+  const hoverColorRef = useRef(new THREE.Color());
+  const currentColor = useRef(new THREE.Color());
+
   useMouseFollow(embed);
 
-  // Aplica rotación suave hacia el mouse en embed mode
+  // Hover animation + mouse follow
   useFrame(() => {
-    if (!embed || !followRef.current) return;
-    followRef.current.rotation.x = THREE.MathUtils.lerp(
-      followRef.current.rotation.x,
-      _targetRotX.current,
-      FOLLOW_LERP
-    );
-    followRef.current.rotation.y = THREE.MathUtils.lerp(
-      followRef.current.rotation.y,
-      _targetRotY.current,
-      FOLLOW_LERP
-    );
+    if (!embed) return;
+
+    // Mouse follow
+    if (followRef.current) {
+      followRef.current.rotation.x = THREE.MathUtils.lerp(
+        followRef.current.rotation.x,
+        _targetRotX.current,
+        FOLLOW_LERP
+      );
+      followRef.current.rotation.y = THREE.MathUtils.lerp(
+        followRef.current.rotation.y,
+        _targetRotY.current,
+        FOLLOW_LERP
+      );
+    }
+
+    // Hover transform lerp
+    if (!hasHoverConfig(obj) || !groupRef.current) return;
+
+    const g = groupRef.current;
+    const t = isHovered ? 1 : 0;
+
+    if (obj.hoverPosition) {
+      g.position.x = THREE.MathUtils.lerp(g.position.x, isHovered ? obj.hoverPosition[0] : obj.position[0], HOVER_LERP);
+      g.position.y = THREE.MathUtils.lerp(g.position.y, isHovered ? obj.hoverPosition[1] : obj.position[1], HOVER_LERP);
+      g.position.z = THREE.MathUtils.lerp(g.position.z, isHovered ? obj.hoverPosition[2] : obj.position[2], HOVER_LERP);
+    }
+
+    if (obj.hoverRotation) {
+      g.rotation.x = THREE.MathUtils.lerp(g.rotation.x, isHovered ? obj.hoverRotation[0] : obj.rotation[0], HOVER_LERP);
+      g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, isHovered ? obj.hoverRotation[1] : obj.rotation[1], HOVER_LERP);
+      g.rotation.z = THREE.MathUtils.lerp(g.rotation.z, isHovered ? obj.hoverRotation[2] : obj.rotation[2], HOVER_LERP);
+    }
+
+    if (obj.hoverScale) {
+      g.scale.x = THREE.MathUtils.lerp(g.scale.x, isHovered ? obj.hoverScale[0] : obj.scale[0], HOVER_LERP);
+      g.scale.y = THREE.MathUtils.lerp(g.scale.y, isHovered ? obj.hoverScale[1] : obj.scale[1], HOVER_LERP);
+      g.scale.z = THREE.MathUtils.lerp(g.scale.z, isHovered ? obj.hoverScale[2] : obj.scale[2], HOVER_LERP);
+    }
+
+    if (obj.hoverColor && materialRef.current && 'color' in materialRef.current) {
+      baseColor.current.set(obj.color);
+      hoverColorRef.current.set(obj.hoverColor);
+      const mat = materialRef.current as THREE.MeshStandardMaterial;
+      currentColor.current.copy(mat.color);
+      const target = isHovered ? hoverColorRef.current : baseColor.current;
+      currentColor.current.lerp(target, HOVER_LERP);
+      mat.color.copy(currentColor.current);
+    }
   });
+
+  const handlePointerOver = embed && hasHoverConfig(obj) ? (e: any) => {
+    e.stopPropagation();
+    if (obj.hoverGroup) {
+      setHoveredGroup(obj.hoverGroup);
+    } else {
+      setLocalHover(true);
+    }
+    document.body.style.cursor = 'pointer';
+  } : undefined;
+
+  const handlePointerOut = embed && hasHoverConfig(obj) ? () => {
+    if (obj.hoverGroup) {
+      setHoveredGroup(null);
+    } else {
+      setLocalHover(false);
+    }
+    document.body.style.cursor = 'auto';
+  } : undefined;
 
   const meshContent = obj.animation === "float" ? (
     <Float speed={2} rotationIntensity={0.3} floatIntensity={1}>
-      <ObjectMesh obj={obj} />
+      <ObjectMesh obj={obj} materialRef={materialRef} />
     </Float>
   ) : (
-    <ObjectMesh obj={obj} />
+    <ObjectMesh obj={obj} materialRef={materialRef} />
   );
 
   const inner = (
@@ -176,6 +252,8 @@ export function SceneObject({ obj, embed }: { obj: SceneObjectType; embed?: bool
         e.stopPropagation();
         selectObject(obj.id);
       }}
+      onPointerOver={handlePointerOver}
+      onPointerOut={handlePointerOut}
     >
       {embed ? (
         <group ref={followRef}>
