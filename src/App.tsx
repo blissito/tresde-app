@@ -3,8 +3,9 @@ import { Sidebar } from "./components/Sidebar";
 import { PropsPanel } from "./components/PropsPanel";
 import { CodePreview } from "./components/CodePreview";
 import { useSceneStore } from "./store/scene";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { epicHeroTemplate, epicHeroEnvironment } from "./templates/epic-hero";
+import { encodeScene, decodeScene } from "./lib/share";
 
 function SlideTextOverlay({ slideIndex }: { slideIndex: number }) {
   const slides = useSceneStore((s) => s.slides);
@@ -28,12 +29,18 @@ function SlideTextOverlay({ slideIndex }: { slideIndex: number }) {
 function EmbedView() {
   const loadTemplate = useSceneStore((s) => s.loadTemplate);
   const setEnvironment = useSceneStore((s) => s.setEnvironment);
+  const loadScene = useSceneStore((s) => s.loadScene);
   const slides = useSceneStore((s) => s.slides);
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
-    loadTemplate(epicHeroTemplate);
-    setEnvironment(epicHeroEnvironment);
+    const shared = decodeScene(window.location.hash);
+    if (shared) {
+      loadScene(shared);
+    } else {
+      loadTemplate(epicHeroTemplate);
+      setEnvironment(epicHeroEnvironment);
+    }
   }, []);
 
   return (
@@ -56,6 +63,7 @@ function EditorView() {
   const [showCode, setShowCode] = useState(false);
   const [preview, setPreview] = useState(false);
   const [previewSlide, setPreviewSlide] = useState(0);
+  const [copied, setCopied] = useState(false);
   const selectedId = useSceneStore((s) => s.selectedId);
   const slides = useSceneStore((s) => s.slides);
   const removeObject = useSceneStore((s) => s.removeObject);
@@ -94,6 +102,25 @@ function EditorView() {
             className="bg-zinc-800 hover:bg-zinc-700 text-sm px-3 py-1.5 rounded-lg border border-zinc-700"
           >
             {showCode ? "Cerrar código" : "Ver código"}
+          </button>
+          <button
+            onClick={() => {
+              const s = useSceneStore.getState();
+              const url = encodeScene({
+                objects: s.objects,
+                environment: s.environment,
+                bgColor: s.bgColor,
+                slides: s.slides,
+                cameraPosition: s.cameraPosition,
+                cameraTarget: s.cameraTarget,
+              });
+              navigator.clipboard.writeText(url);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+            className="bg-zinc-800 hover:bg-zinc-700 text-sm px-3 py-1.5 rounded-lg border border-zinc-700"
+          >
+            {copied ? "✓ Copiado!" : "Compartir"}
           </button>
         </div>
         {showCode && <CodePreview onClose={() => setShowCode(false)} />}

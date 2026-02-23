@@ -90,10 +90,29 @@ interface SceneState {
   clearFlyTo: () => void;
   hoveredGroup: string | null;
   setHoveredGroup: (group: string | null) => void;
+  loadScene: (data: { objects: SceneObject[]; environment: string; bgColor: string; slides: Slide[]; cameraPosition: [number, number, number]; cameraTarget: [number, number, number] }) => void;
 }
 
 let counter = 0;
 let slideCounter = 0;
+
+// Restore counters from persisted state to avoid ID collisions after reload
+try {
+  const persisted = JSON.parse(localStorage.getItem("tresde-scene") || "{}");
+  const state = persisted?.state;
+  if (state?.objects) {
+    for (const obj of state.objects) {
+      const m = obj.id?.match(/^obj-(\d+)$/);
+      if (m) counter = Math.max(counter, Number(m[1]));
+    }
+  }
+  if (state?.slides) {
+    for (const sl of state.slides) {
+      const m = sl.id?.match(/^slide-(\d+)$/);
+      if (m) slideCounter = Math.max(slideCounter, Number(m[1]));
+    }
+  }
+} catch {}
 const names: Record<GeometryType, string> = {
   box: "Cubo",
   sphere: "Esfera",
@@ -244,4 +263,14 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
   clearFlyTo: () => set({ flyToSlideId: null }),
   hoveredGroup: null,
   setHoveredGroup: (group) => set({ hoveredGroup: group }),
+  loadScene: (data) => set({
+    objects: data.objects,
+    environment: data.environment,
+    bgColor: data.bgColor,
+    slides: data.slides,
+    cameraPosition: data.cameraPosition,
+    cameraTarget: data.cameraTarget,
+    selectedId: null,
+    activeSlideId: null,
+  }),
 }), { name: "tresde-scene" }));
