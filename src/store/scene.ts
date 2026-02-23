@@ -62,7 +62,22 @@ const names: Record<GeometryType, string> = {
 };
 
 export const useSceneStore = create<SceneState>((set) => ({
-  objects: [],
+  objects: [
+    {
+      id: "obj-0",
+      name: "Texto 3D 0",
+      geometry: "text3d",
+      material: "standard",
+      animation: "float",
+      position: [0, 1, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      color: "#a78bfa",
+      metalness: 0.3,
+      roughness: 0.2,
+      text: "Hola Pelusina",
+    },
+  ],
   selectedId: null,
   environment: "city",
   transformMode: "translate",
