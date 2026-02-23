@@ -42,7 +42,7 @@ interface SceneState {
   selectedId: string | null;
   environment: string;
   transformMode: "translate" | "rotate" | "scale";
-  addObject: (geometry: GeometryType) => void;
+  addObject: (geometry: GeometryType, position?: [number, number, number]) => void;
   removeObject: (id: string) => void;
   selectObject: (id: string | null) => void;
   updateObject: (id: string, updates: Partial<SceneObject>) => void;
@@ -96,7 +96,7 @@ export const useSceneStore = create<SceneState>((set) => ({
   environment: "city",
   transformMode: "translate",
 
-  addObject: (geometry) => {
+  addObject: (geometry, position?) => {
     const id = `obj-${++counter}`;
     const obj: SceneObject = {
       id,
@@ -104,7 +104,7 @@ export const useSceneStore = create<SceneState>((set) => ({
       geometry,
       material: "standard",
       animation: "none",
-      position: [Math.random() * 2 - 1, 0.5, Math.random() * 2 - 1],
+      position: position ?? [Math.random() * 2 - 1, 0.5, Math.random() * 2 - 1],
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
       color: "#8b5cf6",

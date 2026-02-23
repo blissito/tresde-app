@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import {
   TransformControls,
   Float,
@@ -13,6 +13,11 @@ import {
 } from "@react-three/drei";
 import { useSceneStore, type SceneObject as SceneObjectType } from "../store/scene";
 import * as THREE from "three";
+
+const _targetRotX = { current: 0 };
+const _targetRotY = { current: 0 };
+const FOLLOW_INTENSITY = 0.15; // máxima rotación en radianes (~8.5°)
+const FOLLOW_LERP = 0.05; // suavidad del seguimiento
 
 function GeometryMesh({ obj }: { obj: SceneObjectType }) {
   switch (obj.geometry) {
@@ -114,13 +119,52 @@ function ObjectMesh({ obj }: { obj: SceneObjectType }) {
   );
 }
 
-export function SceneObject({ obj }: { obj: SceneObjectType }) {
+/** Hook que trackea el mouse normalizado (-1 a 1) y lo convierte en rotación target */
+function useMouseFollow(embed?: boolean) {
+  const { pointer } = useThree();
+
+  useFrame(() => {
+    if (!embed) return;
+    // pointer.x y pointer.y van de -1 a 1
+    _targetRotY.current = pointer.x * FOLLOW_INTENSITY;
+    _targetRotX.current = -pointer.y * FOLLOW_INTENSITY;
+  });
+}
+
+export function SceneObject({ obj, embed }: { obj: SceneObjectType; embed?: boolean }) {
   const selectedId = useSceneStore((s) => s.selectedId);
   const selectObject = useSceneStore((s) => s.selectObject);
   const updateObject = useSceneStore((s) => s.updateObject);
   const transformMode = useSceneStore((s) => s.transformMode);
   const groupRef = useRef<THREE.Group>(null!);
-  const isSelected = selectedId === obj.id;
+  const followRef = useRef<THREE.Group>(null!);
+  const isSelected = !embed && selectedId === obj.id;
+
+  // Actualiza target del mouse (solo corre en el primer SceneObject, los demás leen el valor)
+  useMouseFollow(embed);
+
+  // Aplica rotación suave hacia el mouse en embed mode
+  useFrame(() => {
+    if (!embed || !followRef.current) return;
+    followRef.current.rotation.x = THREE.MathUtils.lerp(
+      followRef.current.rotation.x,
+      _targetRotX.current,
+      FOLLOW_LERP
+    );
+    followRef.current.rotation.y = THREE.MathUtils.lerp(
+      followRef.current.rotation.y,
+      _targetRotY.current,
+      FOLLOW_LERP
+    );
+  });
+
+  const meshContent = obj.animation === "float" ? (
+    <Float speed={2} rotationIntensity={0.3} floatIntensity={1}>
+      <ObjectMesh obj={obj} />
+    </Float>
+  ) : (
+    <ObjectMesh obj={obj} />
+  );
 
   const inner = (
     <group
@@ -128,17 +172,17 @@ export function SceneObject({ obj }: { obj: SceneObjectType }) {
       position={obj.position}
       rotation={obj.rotation}
       scale={obj.scale}
-      onClick={(e) => {
+      onClick={embed ? undefined : (e) => {
         e.stopPropagation();
         selectObject(obj.id);
       }}
     >
-      {obj.animation === "float" ? (
-        <Float speed={2} rotationIntensity={0.3} floatIntensity={1}>
-          <ObjectMesh obj={obj} />
-        </Float>
+      {embed ? (
+        <group ref={followRef}>
+          {meshContent}
+        </group>
       ) : (
-        <ObjectMesh obj={obj} />
+        meshContent
       )}
     </group>
   );

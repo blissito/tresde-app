@@ -1,5 +1,6 @@
 import { useSceneStore, type GeometryType } from "../store/scene";
 import { glassHeroTemplate } from "../templates/glass-hero";
+import { epicHeroTemplate, epicHeroEnvironment } from "../templates/epic-hero";
 
 const primitives: { type: GeometryType; label: string; icon: string }[] = [
   { type: "box", label: "Cubo", icon: "□" },
@@ -33,8 +34,13 @@ export function Sidebar() {
           {primitives.map((p) => (
             <button
               key={p.type}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("application/tresde-geometry", p.type);
+                e.dataTransfer.effectAllowed = "copy";
+              }}
               onClick={() => addObject(p.type)}
-              className="flex flex-col items-center gap-0.5 p-2 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
+              className="flex flex-col items-center gap-0.5 p-2 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-grab active:cursor-grabbing"
               title={p.label}
             >
               <span className="text-lg">{p.icon}</span>
@@ -78,13 +84,23 @@ export function Sidebar() {
         </select>
       </div>
 
-      {/* Template */}
-      <div className="p-3 border-b border-zinc-800">
+      {/* Templates */}
+      <div className="p-3 border-b border-zinc-800 space-y-1.5">
+        <h3 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">Templates</h3>
         <button
           onClick={() => loadTemplate(glassHeroTemplate)}
           className="w-full text-sm py-2 rounded-lg bg-gradient-to-r from-violet-600 to-pink-600 text-white font-medium hover:opacity-90 transition-opacity"
         >
-          Cargar Glass Hero
+          Glass Hero
+        </button>
+        <button
+          onClick={() => {
+            loadTemplate(epicHeroTemplate);
+            setEnvironment(epicHeroEnvironment);
+          }}
+          className="w-full text-sm py-2 rounded-lg bg-gradient-to-r from-amber-500 to-rose-500 text-white font-medium hover:opacity-90 transition-opacity"
+        >
+          Epic Hero
         </button>
       </div>
 
