@@ -65,8 +65,11 @@ interface SceneState {
   selectedId: string | null;
   environment: string;
   bgColor: string;
+  cameraPosition: [number, number, number];
+  cameraTarget: [number, number, number];
   transformMode: "translate" | "rotate" | "scale";
   setBgColor: (color: string) => void;
+  setCameraState: (position: [number, number, number], target: [number, number, number]) => void;
   slides: Slide[];
   activeSlideId: string | null;
   flyToSlideId: string | null;
@@ -135,6 +138,8 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
   selectedId: null,
   environment: "city",
   bgColor: "#000000",
+  cameraPosition: [5, 4, 5],
+  cameraTarget: [0, 0, 0],
   transformMode: "translate",
   slides: [],
   activeSlideId: null,
@@ -190,6 +195,7 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
       objects: s.objects.map((o) => (o.id === id ? { ...o, ...updates } : o)),
     })),
 
+  setCameraState: (cameraPosition, cameraTarget) => set({ cameraPosition, cameraTarget }),
   setEnvironment: (environment) => set({ environment }),
   setBgColor: (bgColor) => set({ bgColor }),
   setTransformMode: (transformMode) => set({ transformMode }),

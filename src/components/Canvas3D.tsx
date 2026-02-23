@@ -14,8 +14,9 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import * as THREE from "three";
 
 // Global ref to read camera state from outside R3F
+const _initialCam = useSceneStore.getState();
 export const cameraStateRef: { current: { position: [number, number, number]; target: [number, number, number] } } = {
-  current: { position: [5, 4, 5], target: [0, 0, 0] },
+  current: { position: _initialCam.cameraPosition, target: _initialCam.cameraTarget },
 };
 
 // Ref shared between OrbitControls and CameraTracker
@@ -31,6 +32,25 @@ function CameraController() {
   // Reusable vectors to avoid allocations in useFrame
   const _dir = useRef(new THREE.Vector3());
   const _lookAt = useRef(new THREE.Vector3());
+  const _saveCounter = useRef(0);
+
+  // Restore saved orbit target on mount
+  const _restored = useRef(false);
+  useEffect(() => {
+    if (_restored.current) return;
+    const savedTarget = useSceneStore.getState().cameraTarget;
+    const check = () => {
+      const ctrl = orbitControlsRef.current;
+      if (ctrl?.target) {
+        ctrl.target.set(...savedTarget);
+        ctrl.update();
+        _restored.current = true;
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+    check();
+  }, []);
 
   // Start flying when a slide is clicked
   useEffect(() => {
@@ -82,14 +102,21 @@ function CameraController() {
     }
 
     // Always track camera state for slide captures
-    cameraStateRef.current.position = [camera.position.x, camera.position.y, camera.position.z];
-    // Compute look-at point from camera forward direction * distance to ctrl.target
-    // This ensures the saved target always reflects where the camera looks,
-    // even when the user only rotates without panning.
+    const pos: [number, number, number] = [camera.position.x, camera.position.y, camera.position.z];
     camera.getWorldDirection(_dir.current);
     const dist = ctrl?.target ? camera.position.distanceTo(ctrl.target) : 5;
     _lookAt.current.copy(camera.position).add(_dir.current.multiplyScalar(dist));
-    cameraStateRef.current.target = [_lookAt.current.x, _lookAt.current.y, _lookAt.current.z];
+    const tgt: [number, number, number] = [_lookAt.current.x, _lookAt.current.y, _lookAt.current.z];
+
+    cameraStateRef.current.position = pos;
+    cameraStateRef.current.target = tgt;
+
+    // Persist to store every ~60 frames
+    _saveCounter.current++;
+    if (_saveCounter.current >= 60) {
+      _saveCounter.current = 0;
+      useSceneStore.getState().setCameraState(pos, tgt);
+    }
   });
 
   return null;
@@ -185,6 +212,8 @@ export function Canvas3D({ embed, onSlideChange }: { embed?: boolean; onSlideCha
   const selectObject = useSceneStore((s) => s.selectObject);
   const addObject = useSceneStore((s) => s.addObject);
   const slides = useSceneStore((s) => s.slides);
+  const savedCameraPos = useSceneStore((s) => s.cameraPosition);
+  const savedCameraTarget = useSceneStore((s) => s.cameraTarget);
   const useScrollMode = embed && slides.length >= 2;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -279,7 +308,7 @@ export function Canvas3D({ embed, onSlideChange }: { embed?: boolean; onSlideCha
         ref={canvasRef}
         shadows
         camera={{
-          position: embed ? [0, 0.5, 8] : [5, 4, 5],
+          position: embed ? [0, 0.5, 8] : savedCameraPos,
           fov: embed ? 60 : 50,
         }}
         onPointerMissed={() => !embed && selectObject(null)}
