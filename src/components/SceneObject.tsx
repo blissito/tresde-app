@@ -10,6 +10,7 @@ import {
   MeshWobbleMaterial,
   Text3D,
   Center,
+  useTexture,
 } from "@react-three/drei";
 import { useSceneStore, type SceneObject as SceneObjectType } from "../store/scene";
 import * as THREE from "three";
@@ -30,12 +31,30 @@ function GeometryMesh({ obj }: { obj: SceneObjectType }) {
       return <torusGeometry args={[0.5, 0.2, 16, 32]} />;
     case "dodecahedron":
       return <dodecahedronGeometry args={[0.6]} />;
+    case "cylinder":
+      return <cylinderGeometry args={[0.5, 0.5, 0.1, 64]} />;
     default:
       return <boxGeometry args={[1, 1, 1]} />;
   }
 }
 
+function TexturedMaterial({ obj, materialRef }: { obj: SceneObjectType; materialRef?: React.RefObject<THREE.Material | null> }) {
+  const texture = useTexture(obj.textureUrl!);
+  return (
+    <meshStandardMaterial
+      ref={materialRef as any}
+      map={texture}
+      color="#ffffff"
+      metalness={obj.metalness}
+      roughness={obj.roughness}
+    />
+  );
+}
+
 function MaterialComp({ obj, materialRef }: { obj: SceneObjectType; materialRef?: React.RefObject<THREE.Material | null> }) {
+  if (obj.textureUrl) {
+    return <TexturedMaterial obj={obj} materialRef={materialRef} />;
+  }
   switch (obj.material) {
     case "transmission":
       return (
@@ -81,6 +100,22 @@ function MaterialComp({ obj, materialRef }: { obj: SceneObjectType; materialRef?
         />
       );
   }
+}
+
+function OrbitWrapper({ obj, children }: { obj: SceneObjectType; children: React.ReactNode }) {
+  const orbitRef = useRef<THREE.Group>(null!);
+  const radius = obj.orbitRadius ?? 2;
+  const speed = obj.orbitSpeed ?? 1;
+
+  useFrame((state) => {
+    if (orbitRef.current) {
+      const t = state.clock.elapsedTime * speed;
+      orbitRef.current.position.x = Math.cos(t) * radius;
+      orbitRef.current.position.z = Math.sin(t) * radius;
+    }
+  });
+
+  return <group ref={orbitRef}>{children}</group>;
 }
 
 function ObjectMesh({ obj, materialRef }: { obj: SceneObjectType; materialRef?: React.RefObject<THREE.Material | null> }) {
@@ -141,6 +176,7 @@ export function SceneObject({ obj, embed }: { obj: SceneObjectType; embed?: bool
   const selectedId = useSceneStore((s) => s.selectedId);
   const selectObject = useSceneStore((s) => s.selectObject);
   const updateObject = useSceneStore((s) => s.updateObject);
+  const duplicateObject = useSceneStore((s) => s.duplicateObject);
   const transformMode = useSceneStore((s) => s.transformMode);
   const hoveredGroup = useSceneStore((s) => s.hoveredGroup);
   const setHoveredGroup = useSceneStore((s) => s.setHoveredGroup);
@@ -234,12 +270,18 @@ export function SceneObject({ obj, embed }: { obj: SceneObjectType; embed?: bool
     document.body.style.cursor = 'auto';
   } : undefined;
 
+  const objectMesh = <ObjectMesh obj={obj} materialRef={materialRef} />;
+
   const meshContent = obj.animation === "float" ? (
     <Float speed={2} rotationIntensity={0.3} floatIntensity={1}>
-      <ObjectMesh obj={obj} materialRef={materialRef} />
+      {objectMesh}
     </Float>
+  ) : obj.animation === "orbit" ? (
+    <OrbitWrapper obj={obj}>
+      {objectMesh}
+    </OrbitWrapper>
   ) : (
-    <ObjectMesh obj={obj} materialRef={materialRef} />
+    objectMesh
   );
 
   const inner = (
@@ -250,7 +292,11 @@ export function SceneObject({ obj, embed }: { obj: SceneObjectType; embed?: bool
       scale={obj.scale}
       onClick={embed ? undefined : (e) => {
         e.stopPropagation();
-        selectObject(obj.id);
+        if (e.altKey) {
+          duplicateObject(obj.id);
+        } else {
+          selectObject(obj.id);
+        }
       }}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}

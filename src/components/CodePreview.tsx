@@ -47,6 +47,7 @@ function generateJSX(): string {
         sphere: `<sphereGeometry args={[0.6, 32, 32]} />`,
         torus: `<torusGeometry args={[0.5, 0.2, 16, 32]} />`,
         dodecahedron: `<dodecahedronGeometry args={[0.6]} />`,
+        cylinder: `<cylinderGeometry args={[0.5, 0.5, 0.1, 64]} />`,
       }[obj.geometry] || `<boxGeometry />`;
 
       lines.push(`${meshIndent}<mesh ${pos} ${rot} ${scl} castShadow>`);

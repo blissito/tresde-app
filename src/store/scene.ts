@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type GeometryType =
   | "box"
@@ -6,7 +7,8 @@ export type GeometryType =
   | "torus"
   | "roundedBox"
   | "dodecahedron"
-  | "text3d";
+  | "text3d"
+  | "cylinder";
 
 export type MaterialType =
   | "standard"
@@ -14,7 +16,9 @@ export type MaterialType =
   | "distort"
   | "wobble";
 
-export type AnimationType = "none" | "float" | "rotate";
+export type AnimationType = "none" | "float" | "rotate" | "orbit";
+
+export type HoverPreset = "none" | "lift" | "grow" | "spin" | "tilt" | "glow" | "explode";
 
 export interface Slide {
   id: string;
@@ -45,11 +49,15 @@ export interface SceneObject {
   distort?: number;
   speed?: number;
   // hover interactions
+  hoverPreset?: HoverPreset;
   hoverGroup?: string;
   hoverPosition?: [number, number, number];
   hoverRotation?: [number, number, number];
   hoverScale?: [number, number, number];
   hoverColor?: string;
+  textureUrl?: string;
+  orbitRadius?: number;
+  orbitSpeed?: number;
 }
 
 interface SceneState {
@@ -63,6 +71,7 @@ interface SceneState {
   activeSlideId: string | null;
   flyToSlideId: string | null;
   addObject: (geometry: GeometryType, position?: [number, number, number]) => void;
+  duplicateObject: (id: string) => void;
   removeObject: (id: string) => void;
   selectObject: (id: string | null) => void;
   updateObject: (id: string, updates: Partial<SceneObject>) => void;
@@ -89,9 +98,10 @@ const names: Record<GeometryType, string> = {
   roundedBox: "RoundedBox",
   dodecahedron: "Dodecaedro",
   text3d: "Texto 3D",
+  cylinder: "Moneda",
 };
 
-export const useSceneStore = create<SceneState>((set) => ({
+export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => ({
   objects: [
     {
       id: "obj-0",
@@ -152,6 +162,20 @@ export const useSceneStore = create<SceneState>((set) => ({
     };
     set((s) => ({ objects: [...s.objects, obj], selectedId: id }));
   },
+
+  duplicateObject: (id) =>
+    set((s) => {
+      const src = s.objects.find((o) => o.id === id);
+      if (!src) return s;
+      const newId = `obj-${++counter}`;
+      const clone: SceneObject = {
+        ...src,
+        id: newId,
+        name: `${src.name} copy`,
+        position: [src.position[0] + 0.5, src.position[1], src.position[2] + 0.5],
+      };
+      return { objects: [...s.objects, clone], selectedId: newId };
+    }),
 
   removeObject: (id) =>
     set((s) => ({
@@ -214,4 +238,4 @@ export const useSceneStore = create<SceneState>((set) => ({
   clearFlyTo: () => set({ flyToSlideId: null }),
   hoveredGroup: null,
   setHoveredGroup: (group) => set({ hoveredGroup: group }),
-}));
+}), { name: "tresde-scene" }));

@@ -58,6 +58,24 @@ function EditorView() {
   const [previewSlide, setPreviewSlide] = useState(0);
   const selectedId = useSceneStore((s) => s.selectedId);
   const slides = useSceneStore((s) => s.slides);
+  const removeObject = useSceneStore((s) => s.removeObject);
+  const duplicateObject = useSceneStore((s) => s.duplicateObject);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const sel = useSceneStore.getState().selectedId;
+      if (!sel) return;
+      if ((e.key === "Backspace" || e.key === "Delete") && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement)) {
+        removeObject(sel);
+      }
+      if (e.key === "d" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        duplicateObject(sel);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [removeObject, duplicateObject]);
 
   return (
     <div className="h-screen w-screen flex bg-zinc-950">

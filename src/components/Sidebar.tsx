@@ -10,6 +10,7 @@ const primitives: { type: GeometryType; label: string; icon: string }[] = [
   { type: "roundedBox", label: "RoundedBox", icon: "▢" },
   { type: "dodecahedron", label: "Dodecaedro", icon: "⬡" },
   { type: "text3d", label: "Texto 3D", icon: "A" },
+  { type: "cylinder", label: "Moneda", icon: "🪙" },
 ];
 
 const environments = ["city", "studio", "sunset", "dawn", "night", "forest", "apartment", "lobby", "park", "warehouse"];
