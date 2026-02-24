@@ -54,11 +54,11 @@ Bun.serve({
           Key: key,
           Body: finalHtml,
           ContentType: "text/html",
-          CacheControl: "no-cache",
+          CacheControl: "no-store, must-revalidate",
         })
       );
 
-      const s3Url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+      const s3Url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}?v=${Date.now()}`;
 
       if (existing) {
         updateScene(existing.id, title || null, s3Url, JSON.stringify(sceneData));
