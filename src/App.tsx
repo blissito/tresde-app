@@ -215,7 +215,7 @@ function EditorView() {
       {selectedId && <PropsPanel />}
 
       {showWaitlist && <WaitlistModal onClose={() => setShowWaitlist(false)} />}
-      <Toaster position="bottom-right" toastOptions={{ style: { background: '#18181b', color: '#fff', border: '1px solid #3f3f46' } }} />
+      <Toaster position="bottom-right" containerStyle={{ zIndex: 9999 }} toastOptions={{ style: { background: '#18181b', color: '#fff', border: '1px solid #3f3f46' } }} />
 
       {/* Preview overlay */}
       {preview && (

@@ -16,6 +16,11 @@ db.run(`
   )
 `);
 
+// Migration: add updated_at if missing (table created before this column existed)
+try {
+  db.run(`ALTER TABLE scenes ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`);
+} catch {}
+
 db.run(`CREATE INDEX IF NOT EXISTS idx_session ON scenes(session_id)`);
 
 db.run(`
