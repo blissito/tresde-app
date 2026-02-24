@@ -43,7 +43,8 @@ Bun.serve({
       // Reuse existing scene for this session, or create new
       const existing = getSceneBySession(sessionId);
       const slug = existing?.id || toSlug(title || "escena") + "-" + generateId();
-      const key = `scenes/${slug}.html`;
+      const version = Date.now();
+      const key = `scenes/${slug}-v${version}.html`;
 
       const editButton = `<a href="https://tresde-app.fly.dev/?import=${slug}" target="_blank" style="position:fixed;bottom:12px;left:12px;background:rgba(139,92,246,0.9);color:#fff;padding:6px 14px;border-radius:8px;font:500 13px/1 system-ui,sans-serif;text-decoration:none;z-index:9999;backdrop-filter:blur(4px)">Editar copia</a>`;
       const finalHtml = html.replace("</body>", `${editButton}\n</body>`);
@@ -58,7 +59,7 @@ Bun.serve({
         })
       );
 
-      const s3Url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}?v=${Date.now()}`;
+      const s3Url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
 
       if (existing) {
         updateScene(existing.id, title || null, s3Url, JSON.stringify(sceneData));
