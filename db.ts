@@ -11,7 +11,8 @@ db.run(`
     title TEXT,
     s3_url TEXT NOT NULL,
     scene_data TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
   )
 `);
 
@@ -24,6 +25,17 @@ export interface SceneRow {
   s3_url: string;
   scene_data: string;
   created_at: string;
+  updated_at: string;
+}
+
+export function toSlug(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove accents
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48) || "escena";
 }
 
 export function insertScene(
@@ -37,6 +49,22 @@ export function insertScene(
     `INSERT INTO scenes (id, session_id, title, s3_url, scene_data) VALUES (?, ?, ?, ?, ?)`,
     [id, sessionId, title, s3Url, sceneData]
   );
+}
+
+export function updateScene(
+  id: string,
+  title: string | null,
+  s3Url: string,
+  sceneData: string
+) {
+  db.run(
+    `UPDATE scenes SET title = ?, s3_url = ?, scene_data = ?, updated_at = datetime('now') WHERE id = ?`,
+    [title, s3Url, sceneData, id]
+  );
+}
+
+export function getSceneBySession(sessionId: string): SceneRow | null {
+  return db.query(`SELECT * FROM scenes WHERE session_id = ? LIMIT 1`).get(sessionId) as SceneRow | null;
 }
 
 export function getScenesBySession(sessionId: string): SceneRow[] {

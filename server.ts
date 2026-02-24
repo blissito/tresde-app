@@ -1,5 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { insertScene, getScenesBySession, getSceneById } from "./db";
+import { insertScene, updateScene, getSceneBySession, getScenesBySession, getSceneById, toSlug } from "./db";
 import { join } from "path";
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -39,10 +39,13 @@ Bun.serve({
     // POST /api/publish
     if (url.pathname === "/api/publish" && req.method === "POST") {
       const { html, sceneData, title } = await req.json();
-      const id = generateId();
-      const key = `scenes/${id}.html`;
 
-      const editButton = `<a href="https://tresde-app.fly.dev/?import=${id}" target="_blank" style="position:fixed;bottom:12px;left:12px;background:rgba(139,92,246,0.9);color:#fff;padding:6px 14px;border-radius:8px;font:500 13px/1 system-ui,sans-serif;text-decoration:none;z-index:9999;backdrop-filter:blur(4px)">Editar copia</a>`;
+      // Reuse existing scene for this session, or create new
+      const existing = getSceneBySession(sessionId);
+      const slug = existing?.id || toSlug(title || "escena") + "-" + generateId();
+      const key = `scenes/${slug}.html`;
+
+      const editButton = `<a href="https://tresde-app.fly.dev/?import=${slug}" target="_blank" style="position:fixed;bottom:12px;left:12px;background:rgba(139,92,246,0.9);color:#fff;padding:6px 14px;border-radius:8px;font:500 13px/1 system-ui,sans-serif;text-decoration:none;z-index:9999;backdrop-filter:blur(4px)">Editar copia</a>`;
       const finalHtml = html.replace("</body>", `${editButton}\n</body>`);
 
       await s3.send(
@@ -51,15 +54,20 @@ Bun.serve({
           Key: key,
           Body: finalHtml,
           ContentType: "text/html",
-          CacheControl: "public, max-age=31536000, immutable",
+          CacheControl: "no-cache",
         })
       );
 
       const s3Url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
-      insertScene(id, sessionId, title || null, s3Url, JSON.stringify(sceneData));
+
+      if (existing) {
+        updateScene(existing.id, title || null, s3Url, JSON.stringify(sceneData));
+      } else {
+        insertScene(slug, sessionId, title || null, s3Url, JSON.stringify(sceneData));
+      }
 
       return withSession(
-        Response.json({ url: s3Url, id }),
+        Response.json({ url: s3Url, id: slug }),
         sessionId,
         isNew
       );
