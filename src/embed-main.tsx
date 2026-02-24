@@ -39,17 +39,14 @@ function SlideTextOverlay({ slideIndex }: { slideIndex: number }) {
   );
 }
 
+// Load scene data BEFORE first render so Canvas picks up correct camera position
+if (window.__TRESDE_DATA__) {
+  useSceneStore.getState().loadScene(window.__TRESDE_DATA__);
+}
+
 function EmbedApp() {
   const slides = useSceneStore((s) => s.slides);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const loadScene = useSceneStore((s) => s.loadScene);
-
-  useEffect(() => {
-    const data = window.__TRESDE_DATA__;
-    if (data) {
-      loadScene(data);
-    }
-  }, [loadScene]);
 
   return (
     <div className="h-screen w-screen relative bg-black overflow-hidden">
