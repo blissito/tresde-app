@@ -173,9 +173,14 @@ function ObjModel({ url }: { url: string }) {
   return <primitive object={cloned} />;
 }
 
-function ModelComponent({ url, animationName }: { url: string; animationName?: string }) {
+function isObjUrl(url: string): boolean {
+  if (url.startsWith("data:text/plain")) return true;
   const ext = url.split(".").pop()?.toLowerCase().split("?")[0];
-  if (ext === "obj") return <ObjModel url={url} />;
+  return ext === "obj";
+}
+
+function ModelComponent({ url, animationName }: { url: string; animationName?: string }) {
+  if (isObjUrl(url)) return <ObjModel url={url} />;
   return <GlbModel url={url} animationName={animationName} />;
 }
 

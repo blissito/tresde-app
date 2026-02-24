@@ -146,7 +146,7 @@ export function PropsPanel() {
       )}
 
       {/* GLB Animation */}
-      {obj.geometry === "glb" && obj.glbUrl && (
+      {obj.geometry === "glb" && obj.glbUrl && !obj.glbUrl.endsWith(".obj") && !obj.glbUrl.startsWith("data:text/plain") && (
         <GlbAnimationSelector url={obj.glbUrl} value={obj.glbAnimation} onChange={(v) => update({ glbAnimation: v })} />
       )}
 
