@@ -91,6 +91,8 @@ interface SceneState {
   clearFlyTo: () => void;
   hoveredGroup: string | null;
   setHoveredGroup: (group: string | null) => void;
+  currentSceneId: string | null;
+  setCurrentSceneId: (id: string | null) => void;
   loadScene: (data: { objects: SceneObject[]; environment: string; bgColor: string; slides: Slide[]; cameraPosition: [number, number, number]; cameraTarget: [number, number, number] }) => void;
 }
 
@@ -235,6 +237,8 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
   clearFlyTo: () => set({ flyToSlideId: null }),
   hoveredGroup: null,
   setHoveredGroup: (group) => set({ hoveredGroup: group }),
+  currentSceneId: null,
+  setCurrentSceneId: (id) => set({ currentSceneId: id }),
   loadScene: (data) => set({
     objects: data.objects,
     environment: data.environment,
@@ -244,5 +248,6 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
     cameraTarget: data.cameraTarget,
     selectedId: null,
     activeSlideId: null,
+    currentSceneId: null,
   }),
 }), { name: "tresde-scene" }));

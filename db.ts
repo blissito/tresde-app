@@ -42,8 +42,12 @@ export function deleteScene(id: string): void {
   db.run(`DELETE FROM scenes WHERE id = ?`, [id]);
 }
 
-export function getAllScenes(): SceneRow[] {
-  return db.query(`SELECT * FROM scenes ORDER BY updated_at DESC`).all() as SceneRow[];
+export function getAllScenes(): (SceneRow & { email: string | null })[] {
+  return db.query(`
+    SELECT s.*, w.email FROM scenes s
+    LEFT JOIN waitlist w ON s.session_id = w.session_id
+    ORDER BY s.updated_at DESC
+  `).all() as (SceneRow & { email: string | null })[];
 }
 
 export function isSessionRegistered(sessionId: string): boolean {

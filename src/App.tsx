@@ -93,8 +93,13 @@ function EditorView() {
   useEffect(() => {
     fetch("/api/scenes")
       .then((r) => r.json())
-      .then((scenes: { url: string }[]) => {
-        if (scenes.length > 0) setPublishedUrl(scenes[0].url);
+      .then((scenes: { id: string; url: string }[]) => {
+        if (scenes.length > 0) {
+          setPublishedUrl(scenes[0].url);
+          // Only set currentSceneId if store doesn't already have one (don't override imports)
+          const s = useSceneStore.getState();
+          if (!s.currentSceneId) s.setCurrentSceneId(scenes[0].id);
+        }
       })
       .catch(() => {});
   }, []);
@@ -178,7 +183,8 @@ function EditorView() {
                   cameraTarget: s.cameraTarget,
                 };
                 const html = await generateHTML(sceneState);
-                const { url } = await publishScene(html, sceneState);
+                const { url, id } = await publishScene(html, sceneState, undefined, s.currentSceneId);
+                useSceneStore.getState().setCurrentSceneId(id);
                 setPublishedUrl(url);
                 await navigator.clipboard.writeText(url);
                 setCopied(true);

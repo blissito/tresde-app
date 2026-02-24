@@ -71,12 +71,13 @@ export type { ExportState };
 export async function publishScene(
   html: string,
   sceneData: ExportState,
-  title?: string
+  title?: string,
+  sceneId?: string | null
 ): Promise<{ url: string; id: string }> {
   const res = await fetch("/api/publish", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ html, sceneData, title }),
+    body: JSON.stringify({ html, sceneData, title, sceneId }),
   });
   if (!res.ok) throw new Error("Failed to publish scene");
   return res.json();

@@ -38,10 +38,10 @@ Bun.serve({
 
     // POST /api/publish
     if (url.pathname === "/api/publish" && req.method === "POST") {
-      const { html, sceneData, title } = await req.json();
+      const { html, sceneData, title, sceneId } = await req.json();
 
-      // Reuse existing scene for this session, or create new
-      const existing = getSceneBySession(sessionId);
+      // Use client-provided sceneId to update, otherwise create new
+      const existing = sceneId ? getSceneById(sceneId) : null;
       const slug = existing?.id || toSlug(title || "escena") + "-" + generateId();
       const key = `scenes/${slug}.html`;
 
@@ -145,7 +145,7 @@ Bun.serve({
       const sceneRows = scenes.map((s, i) => `
         <tr class="${i % 2 === 0 ? 'bg-zinc-900/50' : ''}">
           <td class="px-4 py-3 text-white">${s.title || s.id}</td>
-          <td class="px-4 py-3 text-zinc-500 text-sm font-mono">${s.session_id?.slice(0, 8)}…</td>
+          <td class="px-4 py-3 text-sm">${s.email ? `<span class="text-emerald-400">${s.email}</span>` : `<span class="text-zinc-600 font-mono">${s.session_id?.slice(0, 8)}…</span>`}</td>
           <td class="px-4 py-3 text-sm flex items-center gap-2">
             <a href="${s.s3_url}" target="_blank" class="text-violet-400 hover:text-violet-300">Ver live</a>
             <span class="text-zinc-700">·</span>
@@ -196,7 +196,7 @@ Bun.serve({
         <thead>
           <tr class="border-b border-zinc-800 bg-zinc-900">
             <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Título</th>
-            <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Sesión</th>
+            <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Usuario</th>
             <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Links</th>
             <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Actualizado</th>
           </tr>
