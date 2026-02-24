@@ -118,6 +118,9 @@ Bun.serve({
 
     // GET /admin/
     if (url.pathname === "/admin" || url.pathname === "/admin/") {
+      if (url.searchParams.get("key") !== process.env.ADMIN_KEY) {
+        return new Response("No autorizado", { status: 401 });
+      }
       const rows = getAllWaitlist();
       const tableRows = rows.map((r, i) => `
         <tr class="${i % 2 === 0 ? 'bg-zinc-900/50' : ''}">
