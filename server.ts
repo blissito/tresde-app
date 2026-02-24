@@ -224,7 +224,7 @@ Bun.serve({
     }
 
     // Static files
-    const filePath = join(DIST_DIR, url.pathname);
+    const filePath = join(DIST_DIR, decodeURIComponent(url.pathname));
     const file = Bun.file(filePath);
     if (await file.exists()) {
       return new Response(file);
