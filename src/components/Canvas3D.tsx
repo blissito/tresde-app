@@ -353,7 +353,7 @@ function Scene({ embed, preserveCamera, onSlideChange, isRecording, isPlaying }:
           makeDefault
           enableZoom={!embed || !!preserveCamera}
           enablePan={!embed || !!preserveCamera}
-          target={preserveCamera ? savedTarget : undefined}
+          target={savedTarget}
         />
       )}
 
@@ -481,8 +481,8 @@ export function Canvas3D({ embed, preserveCamera, onSlideChange, isRecording, is
         ref={canvasRef}
         shadows
         camera={{
-          position: (embed && !preserveCamera) ? [0, 0.5, 8] : savedCameraPos,
-          fov: preserveCamera ? 50 : (embed ? 60 : 50),
+          position: savedCameraPos,
+          fov: 50,
         }}
         onPointerMissed={() => !embed && selectObject(null)}
         className="!absolute inset-0"

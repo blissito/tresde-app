@@ -3,7 +3,7 @@ import { Sidebar } from "./components/Sidebar";
 import { PropsPanel } from "./components/PropsPanel";
 import { CodePreview } from "./components/CodePreview";
 import { useSceneStore } from "./store/scene";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { epicHeroTemplate, epicHeroEnvironment } from "./templates/epic-hero";
 import { decodeScene } from "./lib/share";
 import { generateHTML, downloadHTML, publishScene } from "./lib/exportHTML";
@@ -62,6 +62,70 @@ function EmbedView() {
   );
 }
 
+function SnippetBlock({ label, code, copied, onCopy, last }: { label: string; code: string; copied: boolean; onCopy: () => void; last?: boolean }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  return (
+    <div className={last ? "" : "mb-4"}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-medium text-zinc-300">{label}</span>
+        <button onClick={onCopy} className="text-xs text-violet-400 hover:text-violet-300">
+          {copied ? '✓ Copiado' : 'Copiar'}
+        </button>
+      </div>
+      <div
+        ref={ref}
+        onClick={() => {
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(ref.current!);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }}
+        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-emerald-400 font-mono break-all cursor-text focus:outline-none select-all"
+      >{code}</div>
+    </div>
+  );
+}
+
+function EmbedModal({ url, onClose }: { url: string; onClose: () => void }) {
+  const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
+  const iframeCode = `<iframe src="${url}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none" allowfullscreen></iframe>`;
+
+  const copy = async (code: string, label: string) => {
+    await navigator.clipboard.writeText(code);
+    setCopiedSnippet(label);
+    setTimeout(() => setCopiedSnippet(null), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg mx-4 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">Embed en tu sitio</h2>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white text-xl leading-none">&times;</button>
+        </div>
+
+        <p className="text-zinc-400 text-sm mb-4">Copia el código y pégalo en el HTML de tu sitio web.</p>
+
+        <SnippetBlock label="Código embed" code={iframeCode} copied={copiedSnippet === 'iframe'} onCopy={() => copy(iframeCode, 'iframe')} />
+        <SnippetBlock label="URL directa" code={url} copied={copiedSnippet === 'url'} onCopy={() => copy(url, 'url')} last />
+
+        <div className="mt-5 pt-4 border-t border-zinc-800 text-center">
+          <p className="text-zinc-500 text-xs mb-1">Hecho con tresde.app</p>
+          <a
+            href="https://fixter.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-violet-400 hover:text-violet-300 text-sm font-medium transition-colors"
+          >
+            fixter.org — Aprende a construir productos como este
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EditorView() {
   const [showCode, setShowCode] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -71,6 +135,7 @@ function EditorView() {
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [showWaitlist, setShowWaitlist] = useState(false);
+  const [showEmbed, setShowEmbed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isPlayingRec, setIsPlayingRec] = useState(false);
   const cameraRecording = useSceneStore((s) => s.cameraRecording);
@@ -226,12 +291,25 @@ function EditorView() {
           >
             {publishing ? "Publicando..." : copied ? "✓ Copiado!" : publishedUrl ? "Publicado" : "Publicar"}
           </button>
+          {publishedUrl && (
+            <button
+              onClick={() => setShowEmbed(true)}
+              className="bg-zinc-800 hover:bg-zinc-700 text-sm px-3 py-1.5 rounded-lg border border-zinc-700"
+            >
+              {"</>"} Embed
+            </button>
+          )}
         </div>
         {showCode && <CodePreview onClose={() => setShowCode(false)} />}
       </div>
       {selectedId && <PropsPanel />}
 
       {showWaitlist && <WaitlistModal onClose={() => setShowWaitlist(false)} />}
+
+      {/* Embed code modal */}
+      {showEmbed && publishedUrl && (
+        <EmbedModal url={publishedUrl} onClose={() => setShowEmbed(false)} />
+      )}
       <Toaster position="bottom-right" containerStyle={{ zIndex: 9999 }} toastOptions={{ style: { background: '#18181b', color: '#fff', border: '1px solid #3f3f46' } }} />
 
       {/* Preview overlay */}
