@@ -60,6 +60,7 @@ export async function generateHTML(state: ExportState): Promise<string> {
         const mime = isObj ? "text/plain" : "model/gltf-binary";
         const dataURI = await assetToDataURI(obj.glbUrl, mime);
         if (dataURI) updates.glbUrl = dataURI;
+        else updates.glbUrl = undefined;
       }
       return Object.keys(updates).length > 0 ? { ...obj, ...updates } : obj;
     })
@@ -107,7 +108,10 @@ export async function publishScene(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ html, sceneData, title, sceneId }),
   });
-  if (!res.ok) throw new Error("Failed to publish scene");
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Publish failed (${res.status})`);
+  }
   return res.json();
 }
 
