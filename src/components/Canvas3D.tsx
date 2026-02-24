@@ -162,10 +162,9 @@ function Scene({ embed, preserveCamera, onSlideChange }: { embed?: boolean; pres
     <>
       <Environment
         preset={environment as any}
-        background={!embed}
+        background
         blur={0.5}
       />
-      {embed && <color attach="background" args={[bgColor]} />}
 
       <ambientLight intensity={embed ? 0.15 : 0.3} />
       <directionalLight

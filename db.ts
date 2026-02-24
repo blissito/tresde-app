@@ -38,6 +38,10 @@ export function getAllWaitlist(): { id: number; email: string; session_id: strin
   return db.query(`SELECT * FROM waitlist ORDER BY created_at DESC`).all() as any;
 }
 
+export function getAllScenes(): SceneRow[] {
+  return db.query(`SELECT * FROM scenes ORDER BY updated_at DESC`).all() as SceneRow[];
+}
+
 export function isSessionRegistered(sessionId: string): boolean {
   const row = db.query(`SELECT 1 FROM waitlist WHERE session_id = ? LIMIT 1`).get(sessionId);
   return !!row;

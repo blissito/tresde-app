@@ -1,5 +1,5 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { insertScene, updateScene, getSceneBySession, getScenesBySession, getSceneById, toSlug, insertWaitlist, isSessionRegistered, getAllWaitlist } from "./db";
+import { insertScene, updateScene, getSceneBySession, getScenesBySession, getSceneById, toSlug, insertWaitlist, isSessionRegistered, getAllWaitlist, getAllScenes } from "./db";
 import { join } from "path";
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -122,7 +122,8 @@ Bun.serve({
         return new Response("No autorizado", { status: 401 });
       }
       const rows = getAllWaitlist();
-      const tableRows = rows.map((r, i) => `
+      const scenes = getAllScenes();
+      const waitlistRows = rows.map((r, i) => `
         <tr class="${i % 2 === 0 ? 'bg-zinc-900/50' : ''}">
           <td class="px-4 py-3 text-zinc-400 text-sm">${r.id}</td>
           <td class="px-4 py-3 text-white">${r.email}</td>
@@ -130,26 +131,37 @@ Bun.serve({
           <td class="px-4 py-3 text-zinc-400 text-sm">${new Date(r.created_at + 'Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
         </tr>`).join('');
 
+      const sceneRows = scenes.map((s, i) => `
+        <tr class="${i % 2 === 0 ? 'bg-zinc-900/50' : ''}">
+          <td class="px-4 py-3 text-white">${s.title || s.id}</td>
+          <td class="px-4 py-3 text-zinc-500 text-sm font-mono">${s.session_id?.slice(0, 8)}…</td>
+          <td class="px-4 py-3 text-sm">
+            <a href="${s.s3_url}" target="_blank" class="text-violet-400 hover:text-violet-300">Ver live</a>
+            <span class="text-zinc-700 mx-1">·</span>
+            <a href="/?import=${s.id}" target="_blank" class="text-emerald-400 hover:text-emerald-300">Abrir en editor</a>
+          </td>
+          <td class="px-4 py-3 text-zinc-400 text-sm">${new Date(s.updated_at + 'Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+        </tr>`).join('');
+
       const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Waitlist — tresde.app</title>
+  <title>Admin — tresde.app</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config={theme:{extend:{colors:{zinc:{950:'#09090b'}}}}}</script>
 </head>
 <body class="bg-zinc-950 text-white min-h-screen p-8">
-  <div class="max-w-3xl mx-auto">
+  <div class="max-w-4xl mx-auto">
     <div class="flex items-center justify-between mb-8">
-      <div>
-        <h1 class="text-2xl font-bold">Lista de espera</h1>
-        <p class="text-zinc-400 text-sm mt-1">${rows.length} registro${rows.length !== 1 ? 's' : ''}</p>
-      </div>
+      <h1 class="text-2xl font-bold">Admin</h1>
       <a href="/" class="text-violet-400 hover:text-violet-300 text-sm">← Editor</a>
     </div>
+
+    <h2 class="text-lg font-semibold mb-2">Lista de espera <span class="text-zinc-500 text-sm font-normal">(${rows.length})</span></h2>
     ${rows.length === 0
-      ? '<p class="text-zinc-500 text-center py-16">Aún no hay registros</p>'
-      : `<div class="border border-zinc-800 rounded-xl overflow-hidden">
+      ? '<p class="text-zinc-500 text-center py-8">Aún no hay registros</p>'
+      : `<div class="border border-zinc-800 rounded-xl overflow-hidden mb-10">
       <table class="w-full text-left">
         <thead>
           <tr class="border-b border-zinc-800 bg-zinc-900">
@@ -159,7 +171,24 @@ Bun.serve({
             <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Fecha</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-zinc-800/50">${tableRows}</tbody>
+        <tbody class="divide-y divide-zinc-800/50">${waitlistRows}</tbody>
+      </table>
+    </div>`}
+
+    <h2 class="text-lg font-semibold mb-2">Escenas publicadas <span class="text-zinc-500 text-sm font-normal">(${scenes.length})</span></h2>
+    ${scenes.length === 0
+      ? '<p class="text-zinc-500 text-center py-8">Sin escenas</p>'
+      : `<div class="border border-zinc-800 rounded-xl overflow-hidden">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="border-b border-zinc-800 bg-zinc-900">
+            <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Título</th>
+            <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Sesión</th>
+            <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Links</th>
+            <th class="px-4 py-3 text-zinc-400 text-xs font-medium uppercase tracking-wider">Actualizado</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-800/50">${sceneRows}</tbody>
       </table>
     </div>`}
   </div>
