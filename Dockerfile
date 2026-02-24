@@ -1,11 +1,11 @@
-FROM node:22-slim AS build
+FROM oven/bun:1 AS base
 WORKDIR /app
-COPY package.json bun.lock ./
-RUN npm install --legacy-peer-deps
-COPY . .
-RUN npm run build
 
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY package.json bun.lock* ./
+RUN bun install
+
+COPY . .
+RUN bun run build
+
 EXPOSE 8080
+CMD ["bun", "server.ts"]

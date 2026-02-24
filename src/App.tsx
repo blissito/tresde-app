@@ -3,9 +3,10 @@ import { Sidebar } from "./components/Sidebar";
 import { PropsPanel } from "./components/PropsPanel";
 import { CodePreview } from "./components/CodePreview";
 import { useSceneStore } from "./store/scene";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { epicHeroTemplate, epicHeroEnvironment } from "./templates/epic-hero";
-import { encodeScene, decodeScene } from "./lib/share";
+import { decodeScene } from "./lib/share";
+import { generateHTML, downloadHTML, publishScene } from "./lib/exportHTML";
 
 function SlideTextOverlay({ slideIndex }: { slideIndex: number }) {
   const slides = useSceneStore((s) => s.slides);
@@ -64,10 +65,27 @@ function EditorView() {
   const [preview, setPreview] = useState(false);
   const [previewSlide, setPreviewSlide] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const selectedId = useSceneStore((s) => s.selectedId);
   const slides = useSceneStore((s) => s.slides);
+  const loadScene = useSceneStore((s) => s.loadScene);
   const removeObject = useSceneStore((s) => s.removeObject);
   const duplicateObject = useSceneStore((s) => s.duplicateObject);
+
+  // Import scene from ?import= param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const importId = params.get("import");
+    if (!importId) return;
+    fetch(`/api/scenes/${importId}/data`)
+      .then((r) => { if (!r.ok) throw new Error("Scene not found"); return r.json(); })
+      .then((data) => {
+        loadScene(data);
+        window.history.replaceState({}, "", "/");
+      })
+      .catch((e) => console.error("Failed to import scene:", e));
+  }, [loadScene]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -104,23 +122,56 @@ function EditorView() {
             {showCode ? "Cerrar código" : "Ver código"}
           </button>
           <button
-            onClick={() => {
-              const s = useSceneStore.getState();
-              const url = encodeScene({
-                objects: s.objects,
-                environment: s.environment,
-                bgColor: s.bgColor,
-                slides: s.slides,
-                cameraPosition: s.cameraPosition,
-                cameraTarget: s.cameraTarget,
-              });
-              navigator.clipboard.writeText(url);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
+            disabled={exporting}
+            onClick={async () => {
+              setExporting(true);
+              try {
+                const s = useSceneStore.getState();
+                const html = await generateHTML({
+                  objects: s.objects,
+                  environment: s.environment,
+                  bgColor: s.bgColor,
+                  slides: s.slides,
+                  cameraPosition: s.cameraPosition,
+                  cameraTarget: s.cameraTarget,
+                });
+                downloadHTML(html);
+              } finally {
+                setExporting(false);
+              }
             }}
-            className="bg-zinc-800 hover:bg-zinc-700 text-sm px-3 py-1.5 rounded-lg border border-zinc-700"
+            className="bg-violet-600 hover:bg-violet-500 text-sm px-3 py-1.5 rounded-lg border border-violet-500 font-medium disabled:opacity-50"
           >
-            {copied ? "✓ Copiado!" : "Compartir"}
+            {exporting ? "Exportando..." : "Exportar HTML"}
+          </button>
+          <button
+            disabled={publishing}
+            onClick={async () => {
+              setPublishing(true);
+              try {
+                const s = useSceneStore.getState();
+                const sceneState = {
+                  objects: s.objects,
+                  environment: s.environment,
+                  bgColor: s.bgColor,
+                  slides: s.slides,
+                  cameraPosition: s.cameraPosition,
+                  cameraTarget: s.cameraTarget,
+                };
+                const html = await generateHTML(sceneState);
+                const { url } = await publishScene(html, sceneState);
+                await navigator.clipboard.writeText(url);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 3000);
+              } catch (e) {
+                console.error("Publish failed:", e);
+              } finally {
+                setPublishing(false);
+              }
+            }}
+            className="bg-zinc-800 hover:bg-zinc-700 text-sm px-3 py-1.5 rounded-lg border border-zinc-700 disabled:opacity-50"
+          >
+            {publishing ? "Publicando..." : copied ? "✓ Copiado!" : "Compartir"}
           </button>
         </div>
         {showCode && <CodePreview onClose={() => setShowCode(false)} />}
