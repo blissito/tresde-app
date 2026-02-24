@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { epicHeroTemplate, epicHeroEnvironment } from "./templates/epic-hero";
 import { decodeScene } from "./lib/share";
 import { generateHTML, downloadHTML, publishScene } from "./lib/exportHTML";
+import { WaitlistModal } from "./components/WaitlistModal";
 
 function SlideTextOverlay({ slideIndex }: { slideIndex: number }) {
   const slides = useSceneStore((s) => s.slides);
@@ -67,6 +68,7 @@ function EditorView() {
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [showWaitlist, setShowWaitlist] = useState(false);
   const selectedId = useSceneStore((s) => s.selectedId);
   const slides = useSceneStore((s) => s.slides);
   const loadScene = useSceneStore((s) => s.loadScene);
@@ -86,6 +88,13 @@ function EditorView() {
       })
       .catch((e) => console.error("Failed to import scene:", e));
   }, [loadScene]);
+
+  useEffect(() => {
+    fetch("/api/waitlist/status")
+      .then((r) => r.json())
+      .then((data) => { if (!data.registered) setShowWaitlist(true); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -178,10 +187,12 @@ function EditorView() {
       </div>
       {selectedId && <PropsPanel />}
 
+      {showWaitlist && <WaitlistModal onClose={() => setShowWaitlist(false)} />}
+
       {/* Preview overlay */}
       {preview && (
         <div className="fixed inset-0 z-50 bg-black overflow-hidden">
-          <Canvas3D embed onSlideChange={setPreviewSlide} />
+          <Canvas3D embed preserveCamera onSlideChange={setPreviewSlide} />
           {slides.length >= 2 && <SlideTextOverlay slideIndex={previewSlide} />}
           <button
             onClick={() => setPreview(false)}

@@ -18,6 +18,27 @@ db.run(`
 
 db.run(`CREATE INDEX IF NOT EXISTS idx_session ON scenes(session_id)`);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS waitlist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    session_id TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
+export function insertWaitlist(email: string, sessionId: string): void {
+  db.run(
+    `INSERT OR IGNORE INTO waitlist (email, session_id) VALUES (?, ?)`,
+    [email, sessionId]
+  );
+}
+
+export function isSessionRegistered(sessionId: string): boolean {
+  const row = db.query(`SELECT 1 FROM waitlist WHERE session_id = ? LIMIT 1`).get(sessionId);
+  return !!row;
+}
+
 export interface SceneRow {
   id: string;
   session_id: string;

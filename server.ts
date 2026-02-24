@@ -1,5 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { insertScene, updateScene, getSceneBySession, getScenesBySession, getSceneById, toSlug } from "./db";
+import { insertScene, updateScene, getSceneBySession, getScenesBySession, getSceneById, toSlug, insertWaitlist, isSessionRegistered } from "./db";
 import { join } from "path";
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -88,6 +88,26 @@ Bun.serve({
         sessionId,
         isNew
       );
+    }
+
+    // POST /api/waitlist
+    if (url.pathname === "/api/waitlist" && req.method === "POST") {
+      try {
+        const { email } = await req.json();
+        if (!email || typeof email !== "string" || !email.includes("@")) {
+          return withSession(Response.json({ ok: false, error: "Email inválido" }, { status: 400 }), sessionId, isNew);
+        }
+        insertWaitlist(email.trim().toLowerCase(), sessionId);
+        return withSession(Response.json({ ok: true }), sessionId, isNew);
+      } catch {
+        return withSession(Response.json({ ok: false, error: "Error" }, { status: 500 }), sessionId, isNew);
+      }
+    }
+
+    // GET /api/waitlist/status
+    if (url.pathname === "/api/waitlist/status" && req.method === "GET") {
+      const registered = isSessionRegistered(sessionId);
+      return withSession(Response.json({ registered }), sessionId, isNew);
     }
 
     // GET /api/scenes/:id/data

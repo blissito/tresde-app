@@ -131,7 +131,27 @@ function DropPlane() {
   );
 }
 
-function Scene({ embed, onSlideChange }: { embed?: boolean; onSlideChange?: (index: number) => void }) {
+function PreviewCameraSetup() {
+  const savedTarget = useSceneStore((s) => s.cameraTarget);
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current) return;
+    const check = () => {
+      const ctrl = orbitControlsRef.current;
+      if (ctrl?.target) {
+        ctrl.target.set(...savedTarget);
+        ctrl.update();
+        done.current = true;
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+    check();
+  }, []);
+  return null;
+}
+
+function Scene({ embed, preserveCamera, onSlideChange }: { embed?: boolean; preserveCamera?: boolean; onSlideChange?: (index: number) => void }) {
   const objects = useSceneStore((s) => s.objects);
   const environment = useSceneStore((s) => s.environment);
   const bgColor = useSceneStore((s) => s.bgColor);
@@ -201,6 +221,7 @@ function Scene({ embed, onSlideChange }: { embed?: boolean; onSlideChange?: (ind
       {useScrollMode && <ScrollScene slides={slides} onSlideChange={onSlideChange} />}
 
       {!embed && <CameraController />}
+      {embed && preserveCamera && !useScrollMode && <PreviewCameraSetup />}
     </>
   );
 }
@@ -208,7 +229,7 @@ function Scene({ embed, onSlideChange }: { embed?: boolean; onSlideChange?: (ind
 // Shared scroll offset for wheel-driven camera animation
 export const scrollOffsetRef = { current: 0 };
 
-export function Canvas3D({ embed, onSlideChange }: { embed?: boolean; onSlideChange?: (index: number) => void }) {
+export function Canvas3D({ embed, preserveCamera, onSlideChange }: { embed?: boolean; preserveCamera?: boolean; onSlideChange?: (index: number) => void }) {
   const selectObject = useSceneStore((s) => s.selectObject);
   const addObject = useSceneStore((s) => s.addObject);
   const slides = useSceneStore((s) => s.slides);
@@ -308,13 +329,13 @@ export function Canvas3D({ embed, onSlideChange }: { embed?: boolean; onSlideCha
         ref={canvasRef}
         shadows
         camera={{
-          position: embed ? [0, 0.5, 8] : savedCameraPos,
+          position: (embed && !preserveCamera) ? [0, 0.5, 8] : savedCameraPos,
           fov: embed ? 60 : 50,
         }}
         onPointerMissed={() => !embed && selectObject(null)}
         className="!absolute inset-0"
       >
-        <Scene embed={embed} onSlideChange={onSlideChange} />
+        <Scene embed={embed} preserveCamera={preserveCamera} onSlideChange={onSlideChange} />
       </Canvas>
     </div>
   );
