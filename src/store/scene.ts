@@ -22,6 +22,12 @@ export type AnimationType = "none" | "float" | "rotate" | "orbit";
 
 export type HoverPreset = "none" | "lift" | "grow" | "spin" | "tilt" | "glow" | "explode";
 
+export interface CameraKeyframe {
+  time: number;
+  position: [number, number, number];
+  target: [number, number, number];
+}
+
 export interface Slide {
   id: string;
   name: string;
@@ -50,6 +56,9 @@ export interface SceneObject {
   // distort material
   distort?: number;
   speed?: number;
+  // mouse interactions
+  parallaxIntensity?: number; // 0-1, depth-based parallax
+  draggable?: boolean;
   // hover interactions
   hoverPreset?: HoverPreset;
   hoverGroup?: string;
@@ -92,11 +101,15 @@ interface SceneState {
   setActiveSlide: (id: string | null) => void;
   flyToSlide: (id: string) => void;
   clearFlyTo: () => void;
+  cameraFollowIntensity: number;
+  setCameraFollowIntensity: (v: number) => void;
   hoveredGroup: string | null;
   setHoveredGroup: (group: string | null) => void;
+  cameraRecording: CameraKeyframe[];
+  setCameraRecording: (rec: CameraKeyframe[]) => void;
   currentSceneId: string | null;
   setCurrentSceneId: (id: string | null) => void;
-  loadScene: (data: { objects: SceneObject[]; environment: string; bgColor: string; slides: Slide[]; cameraPosition: [number, number, number]; cameraTarget: [number, number, number] }) => void;
+  loadScene: (data: { objects: SceneObject[]; environment: string; bgColor: string; slides: Slide[]; cameraPosition: [number, number, number]; cameraTarget: [number, number, number]; cameraFollowIntensity?: number; cameraRecording?: CameraKeyframe[] }) => void;
 }
 
 let counter = 0;
@@ -245,8 +258,12 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
   setActiveSlide: (id) => set({ activeSlideId: id }),
   flyToSlide: (id) => set({ flyToSlideId: id, activeSlideId: id }),
   clearFlyTo: () => set({ flyToSlideId: null }),
+  cameraFollowIntensity: 0.3,
+  setCameraFollowIntensity: (v) => set({ cameraFollowIntensity: v }),
   hoveredGroup: null,
   setHoveredGroup: (group) => set({ hoveredGroup: group }),
+  cameraRecording: [],
+  setCameraRecording: (rec) => set({ cameraRecording: rec }),
   currentSceneId: null,
   setCurrentSceneId: (id) => set({ currentSceneId: id }),
   loadScene: (data) => set({
@@ -256,6 +273,8 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
     slides: data.slides,
     cameraPosition: data.cameraPosition,
     cameraTarget: data.cameraTarget,
+    cameraFollowIntensity: data.cameraFollowIntensity ?? 0.3,
+    cameraRecording: data.cameraRecording ?? [],
     selectedId: null,
     activeSlideId: null,
     currentSceneId: null,

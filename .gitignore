@@ -3,6 +3,9 @@ node_modules
 
 # output
 out
+
+# local database
+data/
 dist
 *.tgz
 

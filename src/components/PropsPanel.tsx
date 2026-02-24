@@ -152,6 +152,31 @@ export function PropsPanel() {
 
       {/* Hover Interactions */}
       <HoverSection obj={obj} update={update} />
+
+      {/* Mouse Interactions */}
+      <div className="space-y-3 border-t border-zinc-800 pt-3">
+        <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Mouse Interactions</span>
+        <Slider
+          label="Parallax Intensity"
+          value={obj.parallaxIntensity ?? 0}
+          onChange={(v) => update({ parallaxIntensity: v })}
+        />
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-zinc-500">Draggable</span>
+          <button
+            onClick={() => update({ draggable: !obj.draggable })}
+            className={`w-9 h-5 rounded-full transition-colors relative ${
+              obj.draggable ? "bg-violet-600" : "bg-zinc-700"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                obj.draggable ? "translate-x-4" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

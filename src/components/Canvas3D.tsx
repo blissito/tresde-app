@@ -7,11 +7,17 @@ import {
   GizmoHelper,
   GizmoViewport,
 } from "@react-three/drei";
-import { useSceneStore, type GeometryType } from "../store/scene";
+import { useSceneStore, type GeometryType, type CameraKeyframe } from "../store/scene";
 import { SceneObject } from "./SceneObject";
 import { ScrollScene } from "./ScrollScene";
 import { useRef, useState, useCallback, useEffect } from "react";
 import * as THREE from "three";
+
+// Shared ref: is an object being dragged? Disables scroll/orbit during drag
+export const isDraggingObjectRef = { current: false };
+
+// Shared ref: camera mouse offset for CameraMouseFollow
+export const cameraMouseOffsetRef = { current: { x: 0, y: 0 } };
 
 // Global ref to read camera state from outside R3F
 const _initialCam = useSceneStore.getState();
@@ -131,32 +137,161 @@ function DropPlane() {
   );
 }
 
-function PreviewCameraSetup() {
-  const savedTarget = useSceneStore((s) => s.cameraTarget);
-  const done = useRef(false);
-  useEffect(() => {
-    if (done.current) return;
-    const check = () => {
-      const ctrl = orbitControlsRef.current;
-      if (ctrl?.target) {
-        ctrl.target.set(...savedTarget);
-        ctrl.update();
-        done.current = true;
-      } else {
-        requestAnimationFrame(check);
-      }
-    };
-    check();
-  }, []);
+
+// Only computes camera offset ref for scroll mode. Non-scroll mode doesn't
+// touch camera (OrbitControls owns it).
+function CameraMouseFollow() {
+  const { pointer } = useThree();
+  const intensity = useSceneStore((s) => s.cameraFollowIntensity);
+
+  useFrame(() => {
+    const targetX = pointer.x * intensity * 0.3;
+    const targetY = pointer.y * intensity * 0.3;
+    cameraMouseOffsetRef.current.x = THREE.MathUtils.lerp(cameraMouseOffsetRef.current.x, targetX, 0.04);
+    cameraMouseOffsetRef.current.y = THREE.MathUtils.lerp(cameraMouseOffsetRef.current.y, targetY, 0.04);
+  });
+
   return null;
 }
 
-function Scene({ embed, preserveCamera, onSlideChange }: { embed?: boolean; preserveCamera?: boolean; onSlideChange?: (index: number) => void }) {
+// Ramer-Douglas-Peucker for 6D points (position + target)
+function rdpSimplify(points: CameraKeyframe[], epsilon: number): CameraKeyframe[] {
+  if (points.length <= 2) return points;
+
+  const dist6D = (p: CameraKeyframe, a: CameraKeyframe, b: CameraKeyframe) => {
+    const tRange = b.time - a.time;
+    if (tRange === 0) return 0;
+    const t = (p.time - a.time) / tRange;
+    let sum = 0;
+    for (let i = 0; i < 3; i++) {
+      const ip = a.position[i] + t * (b.position[i] - a.position[i]);
+      const it = a.target[i] + t * (b.target[i] - a.target[i]);
+      sum += (p.position[i] - ip) ** 2 + (p.target[i] - it) ** 2;
+    }
+    return Math.sqrt(sum);
+  };
+
+  let maxDist = 0, maxIdx = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = dist6D(points[i], points[0], points[points.length - 1]);
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
+  }
+
+  if (maxDist > epsilon) {
+    const left = rdpSimplify(points.slice(0, maxIdx + 1), epsilon);
+    const right = rdpSimplify(points.slice(maxIdx), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [points[0], points[points.length - 1]];
+}
+
+function CameraRecorder({ recording, onStop }: { recording: boolean; onStop: (keyframes: CameraKeyframe[]) => void }) {
+  const frames = useRef<CameraKeyframe[]>([]);
+  const startTime = useRef(0);
+  const frameCount = useRef(0);
+  const wasRecording = useRef(false);
+
+  useFrame((state) => {
+    if (recording) {
+      if (!wasRecording.current) {
+        // Just started recording
+        frames.current = [];
+        startTime.current = state.clock.elapsedTime;
+        frameCount.current = 0;
+        wasRecording.current = true;
+      }
+
+      frameCount.current++;
+      // Sample every 2 frames (~30fps)
+      if (frameCount.current % 2 !== 0) return;
+
+      const time = state.clock.elapsedTime - startTime.current;
+      const { camera } = state;
+      const ctrl = orbitControlsRef.current;
+      const target = ctrl?.target || new THREE.Vector3();
+
+      frames.current.push({
+        time,
+        position: [camera.position.x, camera.position.y, camera.position.z],
+        target: [target.x, target.y, target.z],
+      });
+    } else if (wasRecording.current) {
+      wasRecording.current = false;
+      if (frames.current.length > 2) {
+        const simplified = rdpSimplify(frames.current, 0.05);
+        onStop(simplified);
+      }
+      frames.current = [];
+    }
+  });
+
+  return null;
+}
+
+export function CameraPlayback({ keyframes, loop }: { keyframes: CameraKeyframe[]; loop?: boolean }) {
+  const { camera } = useThree();
+  const startTime = useRef(-1);
+
+  useFrame((state) => {
+    if (keyframes.length < 2) return;
+
+    if (startTime.current < 0) startTime.current = state.clock.elapsedTime;
+
+    let t = state.clock.elapsedTime - startTime.current;
+    const duration = keyframes[keyframes.length - 1].time;
+
+    if (duration <= 0) return;
+
+    if (loop) t = t % duration;
+    else t = Math.min(t, duration);
+
+    // Find surrounding keyframes
+    let fromIdx = 0;
+    for (let i = 0; i < keyframes.length - 1; i++) {
+      if (keyframes[i + 1].time >= t) { fromIdx = i; break; }
+      fromIdx = i;
+    }
+    const toIdx = Math.min(fromIdx + 1, keyframes.length - 1);
+
+    const from = keyframes[fromIdx];
+    const to = keyframes[toIdx];
+    const segDur = to.time - from.time;
+    const localT = segDur > 0 ? (t - from.time) / segDur : 0;
+    const eased = localT * localT * (3 - 2 * localT); // smoothstep
+
+    const pos = new THREE.Vector3().lerpVectors(
+      new THREE.Vector3(...from.position),
+      new THREE.Vector3(...to.position),
+      eased
+    );
+    const tgt = new THREE.Vector3().lerpVectors(
+      new THREE.Vector3(...from.target),
+      new THREE.Vector3(...to.target),
+      eased
+    );
+
+    camera.position.copy(pos);
+    camera.lookAt(tgt);
+
+    // Sync orbit controls target
+    const ctrl = orbitControlsRef.current;
+    if (ctrl?.target) {
+      ctrl.target.copy(tgt);
+    }
+  });
+
+  return null;
+}
+
+function Scene({ embed, preserveCamera, onSlideChange, isRecording, isPlaying }: { embed?: boolean; preserveCamera?: boolean; onSlideChange?: (index: number) => void; isRecording?: boolean; isPlaying?: boolean }) {
   const objects = useSceneStore((s) => s.objects);
   const environment = useSceneStore((s) => s.environment);
   const bgColor = useSceneStore((s) => s.bgColor);
   const slides = useSceneStore((s) => s.slides);
-  const useScrollMode = embed && slides.length >= 2;
+  const savedTarget = useSceneStore((s) => s.cameraTarget);
+  const cameraRecording = useSceneStore((s) => s.cameraRecording);
+  const setCameraRecording = useSceneStore((s) => s.setCameraRecording);
+  const useScrollMode = embed && slides.length >= 2 && !isPlaying;
 
   return (
     <>
@@ -213,14 +348,28 @@ function Scene({ embed, preserveCamera, onSlideChange }: { embed?: boolean; pres
 
       <DropPlane />
 
-      {!useScrollMode && (
-        <OrbitControls makeDefault enableZoom={!embed} enablePan={!embed} />
+      {!useScrollMode && !isPlaying && (
+        <OrbitControls
+          makeDefault
+          enableZoom={!embed || !!preserveCamera}
+          enablePan={!embed || !!preserveCamera}
+          target={preserveCamera ? savedTarget : undefined}
+        />
       )}
 
       {useScrollMode && <ScrollScene slides={slides} onSlideChange={onSlideChange} />}
 
+      {useScrollMode && <CameraMouseFollow />}
+
       {!embed && <CameraController />}
-      {embed && preserveCamera && !useScrollMode && <PreviewCameraSetup />}
+
+      {embed && isRecording !== undefined && (
+        <CameraRecorder recording={!!isRecording} onStop={(kf) => setCameraRecording(kf)} />
+      )}
+
+      {isPlaying && cameraRecording.length >= 2 && (
+        <CameraPlayback keyframes={cameraRecording} loop />
+      )}
     </>
   );
 }
@@ -228,7 +377,7 @@ function Scene({ embed, preserveCamera, onSlideChange }: { embed?: boolean; pres
 // Shared scroll offset for wheel-driven camera animation
 export const scrollOffsetRef = { current: 0 };
 
-export function Canvas3D({ embed, preserveCamera, onSlideChange }: { embed?: boolean; preserveCamera?: boolean; onSlideChange?: (index: number) => void }) {
+export function Canvas3D({ embed, preserveCamera, onSlideChange, isRecording, isPlaying }: { embed?: boolean; preserveCamera?: boolean; onSlideChange?: (index: number) => void; isRecording?: boolean; isPlaying?: boolean }) {
   const selectObject = useSceneStore((s) => s.selectObject);
   const addObject = useSceneStore((s) => s.addObject);
   const slides = useSceneStore((s) => s.slides);
@@ -307,6 +456,7 @@ export function Canvas3D({ embed, preserveCamera, onSlideChange }: { embed?: boo
 
     const handler = (e: WheelEvent) => {
       e.preventDefault();
+      if (isDraggingObjectRef.current) return;
       const pages = slides.length;
       const delta = e.deltaY / (window.innerHeight * pages);
       scrollOffsetRef.current = Math.max(0, Math.min(1, scrollOffsetRef.current + delta));
@@ -332,12 +482,12 @@ export function Canvas3D({ embed, preserveCamera, onSlideChange }: { embed?: boo
         shadows
         camera={{
           position: (embed && !preserveCamera) ? [0, 0.5, 8] : savedCameraPos,
-          fov: (embed && !preserveCamera) ? 60 : 50,
+          fov: preserveCamera ? 50 : (embed ? 60 : 50),
         }}
         onPointerMissed={() => !embed && selectObject(null)}
         className="!absolute inset-0"
       >
-        <Scene embed={embed} preserveCamera={preserveCamera} onSlideChange={onSlideChange} />
+        <Scene embed={embed} preserveCamera={preserveCamera} onSlideChange={onSlideChange} isRecording={isRecording} isPlaying={isPlaying} />
       </Canvas>
     </div>
   );

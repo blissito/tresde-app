@@ -45,6 +45,28 @@ const bgPresets = [
   { label: "Crema", color: "#faf5ee" },
 ];
 
+function CameraFollowSlider() {
+  const value = useSceneStore((s) => s.cameraFollowIntensity);
+  const set = useSceneStore((s) => s.setCameraFollowIntensity);
+  return (
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span className="text-zinc-500">Intensity</span>
+        <span className="text-zinc-400">{value.toFixed(2)}</span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value}
+        onChange={(e) => set(parseFloat(e.target.value))}
+        className="w-full accent-violet-500"
+      />
+    </div>
+  );
+}
+
 export function Sidebar() {
   const addObject = useSceneStore((s) => s.addObject);
   const objects = useSceneStore((s) => s.objects);
@@ -167,6 +189,12 @@ export function Sidebar() {
             />
           ))}
         </div>
+      </div>
+
+      {/* Camera Follow */}
+      <div className="p-3 border-b border-zinc-800">
+        <h3 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">Camera Follow</h3>
+        <CameraFollowSlider />
       </div>
 
       {/* Templates */}

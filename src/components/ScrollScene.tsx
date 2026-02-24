@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Slide } from "../store/scene";
-import { scrollOffsetRef } from "./Canvas3D";
+import { scrollOffsetRef, cameraMouseOffsetRef, isDraggingObjectRef } from "./Canvas3D";
 
 export function ScrollScene({
   slides,
@@ -63,6 +63,10 @@ export function ScrollScene({
       new THREE.Vector3(...to.cameraTarget),
       eased
     );
+    // Apply camera mouse offset
+    camera.position.x += cameraMouseOffsetRef.current.x;
+    camera.position.y += cameraMouseOffsetRef.current.y;
+
     camera.lookAt(targetVec.current);
 
     if (onSlideChange) {

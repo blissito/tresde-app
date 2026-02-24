@@ -71,6 +71,10 @@ function EditorView() {
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [showWaitlist, setShowWaitlist] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPlayingRec, setIsPlayingRec] = useState(false);
+  const cameraRecording = useSceneStore((s) => s.cameraRecording);
+  const setCameraRecording = useSceneStore((s) => s.setCameraRecording);
   const selectedId = useSceneStore((s) => s.selectedId);
   const slides = useSceneStore((s) => s.slides);
   const loadScene = useSceneStore((s) => s.loadScene);
@@ -166,6 +170,8 @@ function EditorView() {
                   slides: s.slides,
                   cameraPosition: s.cameraPosition,
                   cameraTarget: s.cameraTarget,
+                  cameraFollowIntensity: s.cameraFollowIntensity,
+                  cameraRecording: s.cameraRecording,
                 });
                 downloadHTML(html);
                 toast.success("HTML descargado");
@@ -194,6 +200,8 @@ function EditorView() {
                   slides: s.slides,
                   cameraPosition: s.cameraPosition,
                   cameraTarget: s.cameraTarget,
+                  cameraFollowIntensity: s.cameraFollowIntensity,
+                  cameraRecording: s.cameraRecording,
                 };
                 const html = await generateHTML(sceneState);
                 const { url, id } = await publishScene(html, sceneState, undefined, s.currentSceneId);
@@ -229,16 +237,61 @@ function EditorView() {
       {/* Preview overlay */}
       {preview && (
         <div className="fixed inset-0 z-50 bg-black overflow-hidden">
-          <Canvas3D embed preserveCamera onSlideChange={setPreviewSlide} />
-          {slides.length >= 2 && <SlideTextOverlay slideIndex={previewSlide} />}
+          <Canvas3D embed preserveCamera onSlideChange={setPreviewSlide} isRecording={isRecording} isPlaying={isPlayingRec} />
+          {slides.length >= 2 && !isPlayingRec && <SlideTextOverlay slideIndex={previewSlide} />}
           <button
-            onClick={() => setPreview(false)}
+            onClick={() => { setIsRecording(false); setIsPlayingRec(false); setPreview(false); }}
             className="absolute top-4 right-4 z-50 bg-zinc-900/80 hover:bg-zinc-800/90 text-white text-sm px-3 py-1.5 rounded-lg backdrop-blur-sm border border-zinc-700/50 transition-colors"
           >
             ✕ Salir
           </button>
+          {/* Camera recording controls */}
+          <div className="absolute top-4 left-4 z-50 flex gap-2">
+            {!isRecording && !isPlayingRec && (
+              <button
+                onClick={() => setIsRecording(true)}
+                className="bg-red-600 hover:bg-red-500 text-white text-sm px-3 py-1.5 rounded-lg border border-red-500 font-medium flex items-center gap-1.5"
+              >
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse" /> REC
+              </button>
+            )}
+            {isRecording && (
+              <button
+                onClick={() => setIsRecording(false)}
+                className="bg-zinc-800 hover:bg-zinc-700 text-white text-sm px-3 py-1.5 rounded-lg border border-zinc-600 font-medium"
+              >
+                ■ Stop
+              </button>
+            )}
+            {!isRecording && cameraRecording.length >= 2 && (
+              <>
+                <button
+                  onClick={() => setIsPlayingRec(!isPlayingRec)}
+                  className={`text-white text-sm px-3 py-1.5 rounded-lg border font-medium ${
+                    isPlayingRec ? "bg-violet-600 border-violet-500" : "bg-zinc-800 border-zinc-600 hover:bg-zinc-700"
+                  }`}
+                >
+                  {isPlayingRec ? "⏸ Pause" : "▶ Play"}
+                </button>
+                {!isPlayingRec && (
+                  <button
+                    onClick={() => setCameraRecording([])}
+                    className="bg-zinc-800 hover:bg-zinc-700 text-white text-sm px-3 py-1.5 rounded-lg border border-zinc-600 font-medium"
+                  >
+                    ✕ Clear
+                  </button>
+                )}
+              </>
+            )}
+            {isRecording && (
+              <span className="text-red-400 text-sm self-center animate-pulse">Grabando...</span>
+            )}
+            {!isRecording && cameraRecording.length >= 2 && !isPlayingRec && (
+              <span className="text-white/40 text-sm self-center">{cameraRecording.length} keyframes</span>
+            )}
+          </div>
           <div className="absolute bottom-3 right-3 text-white/30 text-xs pointer-events-none">
-            {slides.length >= 2 ? "Scroll para navegar" : "Vista previa"}
+            {isPlayingRec ? "Reproduciendo grabación" : slides.length >= 2 ? "Scroll para navegar" : "Vista previa"}
           </div>
         </div>
       )}

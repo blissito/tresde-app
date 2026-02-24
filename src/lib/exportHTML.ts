@@ -1,4 +1,4 @@
-import type { SceneObject, Slide } from "../store/scene";
+import type { SceneObject, Slide, CameraKeyframe } from "../store/scene";
 import embedTemplate from "../../dist-embed/embed.html?raw";
 
 interface ExportState {
@@ -8,6 +8,8 @@ interface ExportState {
   slides: Slide[];
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
+  cameraFollowIntensity?: number;
+  cameraRecording?: CameraKeyframe[];
 }
 
 async function assetToDataURI(url: string, mimeType: string): Promise<string | null> {
@@ -83,6 +85,7 @@ export async function generateHTML(state: ExportState): Promise<string> {
     slides: state.slides,
     cameraPosition: state.cameraPosition,
     cameraTarget: state.cameraTarget,
+    cameraRecording: state.cameraRecording,
   };
 
   // Inject scene data + font into the embed template
