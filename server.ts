@@ -38,39 +38,44 @@ Bun.serve({
 
     // POST /api/publish
     if (url.pathname === "/api/publish" && req.method === "POST") {
-      const { html, sceneData, title, sceneId } = await req.json();
+      try {
+        const { html, sceneData, title, sceneId } = await req.json();
 
-      // Use client-provided sceneId to update, otherwise create new
-      const existing = sceneId ? getSceneById(sceneId) : null;
-      const slug = existing?.id || toSlug(title || "escena") + "-" + generateId();
-      const key = `scenes/${slug}.html`;
+        // Use client-provided sceneId to update, otherwise create new
+        const existing = sceneId ? getSceneById(sceneId) : null;
+        const slug = existing?.id || toSlug(title || "escena") + "-" + generateId();
+        const key = `scenes/${slug}.html`;
 
-      const editButton = `<a href="https://tresde-app.fly.dev/?import=${slug}" target="_blank" style="position:fixed;bottom:12px;left:12px;background:rgba(139,92,246,0.9);color:#fff;padding:6px 14px;border-radius:8px;font:500 13px/1 system-ui,sans-serif;text-decoration:none;z-index:9999;backdrop-filter:blur(4px)">Editar copia</a>`;
-      const finalHtml = html.replace("</body>", `${editButton}\n</body>`);
+        const editButton = `<a href="https://tresde-app.fly.dev/?import=${slug}" target="_blank" style="position:fixed;bottom:12px;left:12px;background:rgba(139,92,246,0.9);color:#fff;padding:6px 14px;border-radius:8px;font:500 13px/1 system-ui,sans-serif;text-decoration:none;z-index:9999;backdrop-filter:blur(4px)">Editar copia</a>`;
+        const finalHtml = html.replace("</body>", `${editButton}\n</body>`);
 
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: BUCKET,
-          Key: key,
-          Body: finalHtml,
-          ContentType: "text/html",
-          CacheControl: "no-store, must-revalidate",
-        })
-      );
+        await s3.send(
+          new PutObjectCommand({
+            Bucket: BUCKET,
+            Key: key,
+            Body: Buffer.from(finalHtml),
+            ContentType: "text/html",
+            CacheControl: "no-store, must-revalidate",
+          })
+        );
 
-      const s3Url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+        const s3Url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
 
-      if (existing) {
-        updateScene(existing.id, title || null, s3Url, JSON.stringify(sceneData));
-      } else {
-        insertScene(slug, sessionId, title || null, s3Url, JSON.stringify(sceneData));
+        if (existing) {
+          updateScene(existing.id, title || null, s3Url, JSON.stringify(sceneData));
+        } else {
+          insertScene(slug, sessionId, title || null, s3Url, JSON.stringify(sceneData));
+        }
+
+        return withSession(
+          Response.json({ url: s3Url, id: slug }),
+          sessionId,
+          isNew
+        );
+      } catch (err) {
+        console.error("POST /api/publish error:", err);
+        return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
-
-      return withSession(
-        Response.json({ url: s3Url, id: slug }),
-        sessionId,
-        isNew
-      );
     }
 
     // GET /api/scenes
@@ -120,7 +125,7 @@ Bun.serve({
       if (scene) {
         try {
           const s3Key = new URL(scene.s3_url).pathname.slice(1);
-          await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: s3Key, Body: "", ContentType: "text/html" }));
+          await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: s3Key, Body: Buffer.from(""), ContentType: "text/html" }));
         } catch {}
         deleteScene(scene.id);
       }
