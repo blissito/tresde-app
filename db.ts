@@ -34,6 +34,10 @@ export function insertWaitlist(email: string, sessionId: string): void {
   );
 }
 
+export function getAllWaitlist(): { id: number; email: string; session_id: string; created_at: string }[] {
+  return db.query(`SELECT * FROM waitlist ORDER BY created_at DESC`).all() as any;
+}
+
 export function isSessionRegistered(sessionId: string): boolean {
   const row = db.query(`SELECT 1 FROM waitlist WHERE session_id = ? LIMIT 1`).get(sessionId);
   return !!row;
