@@ -3,14 +3,24 @@ import { cameraStateRef } from "./Canvas3D";
 import { glassHeroTemplate } from "../templates/glass-hero";
 import { epicHeroTemplate, epicHeroEnvironment } from "../templates/epic-hero";
 
-// Auto-discover 3D model files from public/assets/glbs/
-const modelFiles = Object.keys(
+// Auto-discover 3D model files from public/assets/
+const glbFiles = Object.keys(
   import.meta.glob("/public/assets/glbs/*.{glb,obj}", { eager: false })
 ).map((path) => {
   const filename = path.split("/").pop()!;
   const name = filename.replace(/\.(glb|obj)$/i, "");
   return { name, url: `/assets/glbs/${filename}` };
 });
+
+const objFiles = Object.keys(
+  import.meta.glob("/public/assets/objs/*.obj", { eager: false })
+).map((path) => {
+  const filename = path.split("/").pop()!;
+  const name = filename.replace(/\.obj$/i, "");
+  return { name, url: `/assets/objs/${filename}` };
+});
+
+const modelFiles = [...glbFiles, ...objFiles];
 
 const primitives: { type: GeometryType; label: string; icon: string }[] = [
   { type: "box", label: "Cubo", icon: "□" },

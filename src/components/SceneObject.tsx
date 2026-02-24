@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
   TransformControls,
@@ -12,6 +12,7 @@ import {
   Center,
   useTexture,
   useGLTF,
+  useAnimations,
 } from "@react-three/drei";
 import { useLoader } from "@react-three/fiber";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
@@ -122,17 +123,42 @@ function OrbitWrapper({ obj, children }: { obj: SceneObjectType; children: React
   return <group ref={orbitRef}>{children}</group>;
 }
 
-function GlbModel({ url }: { url: string }) {
-  const { scene } = useGLTF(url);
+function GlbModel({ url, animationName }: { url: string; animationName?: string }) {
+  const { scene, animations } = useGLTF(url);
   const cloned = useMemo(() => {
     const c = cloneWithSkeleton(scene);
-    // Reset root transform so it follows parent group
     c.position.set(0, 0, 0);
     c.rotation.set(0, 0, 0);
     c.scale.set(1, 1, 1);
     return c;
   }, [scene]);
-  return <primitive object={cloned} />;
+  const groupRef = useRef<THREE.Group>(null!);
+  const { actions } = useAnimations(animations, groupRef);
+
+  useEffect(() => {
+    // Stop all current animations
+    Object.values(actions).forEach((a) => a?.stop());
+
+    // Determine which clip to play
+    const clipName =
+      animationName && animationName !== "__none__"
+        ? animationName === "__first__"
+          ? animations[0]?.name
+          : animationName
+        : animations.length > 0
+          ? animations[0]?.name
+          : undefined;
+
+    if (clipName && actions[clipName]) {
+      actions[clipName]!.reset().fadeIn(0.3).play();
+    }
+  }, [animationName, actions, animations]);
+
+  return (
+    <group ref={groupRef}>
+      <primitive object={cloned} />
+    </group>
+  );
 }
 
 function ObjModel({ url }: { url: string }) {
@@ -147,10 +173,10 @@ function ObjModel({ url }: { url: string }) {
   return <primitive object={cloned} />;
 }
 
-function ModelComponent({ url }: { url: string }) {
+function ModelComponent({ url, animationName }: { url: string; animationName?: string }) {
   const ext = url.split(".").pop()?.toLowerCase().split("?")[0];
   if (ext === "obj") return <ObjModel url={url} />;
-  return <GlbModel url={url} />;
+  return <GlbModel url={url} animationName={animationName} />;
 }
 
 function ObjectMesh({ obj, materialRef }: { obj: SceneObjectType; materialRef?: React.RefObject<THREE.Material | null> }) {
@@ -165,7 +191,7 @@ function ObjectMesh({ obj, materialRef }: { obj: SceneObjectType; materialRef?: 
   if (obj.geometry === "glb" && obj.glbUrl) {
     return (
       <group ref={ref as any}>
-        <ModelComponent url={obj.glbUrl} />
+        <ModelComponent url={obj.glbUrl} animationName={obj.glbAnimation} />
       </group>
     );
   }

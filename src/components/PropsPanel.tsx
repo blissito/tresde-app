@@ -1,3 +1,4 @@
+import { useGLTF } from "@react-three/drei";
 import { useSceneStore, type MaterialType, type AnimationType, type HoverPreset } from "../store/scene";
 
 const materials: { value: MaterialType; label: string }[] = [
@@ -144,9 +145,35 @@ export function PropsPanel() {
         </Field>
       )}
 
+      {/* GLB Animation */}
+      {obj.geometry === "glb" && obj.glbUrl && (
+        <GlbAnimationSelector url={obj.glbUrl} value={obj.glbAnimation} onChange={(v) => update({ glbAnimation: v })} />
+      )}
+
       {/* Hover Interactions */}
       <HoverSection obj={obj} update={update} />
     </div>
+  );
+}
+
+function GlbAnimationSelector({ url, value, onChange }: { url: string; value?: string; onChange: (v: string | undefined) => void }) {
+  const { animations } = useGLTF(url);
+  if (!animations || animations.length === 0) return null;
+
+  return (
+    <Field label="Animación GLB">
+      <select
+        value={value ?? "__first__"}
+        onChange={(e) => onChange(e.target.value === "__none__" ? "__none__" : e.target.value)}
+        className="w-full bg-zinc-800 text-sm rounded-md px-2 py-1.5 border border-zinc-700 text-white"
+      >
+        <option value="__none__">Ninguna</option>
+        <option value="__first__">Primera (default)</option>
+        {animations.map((a) => (
+          <option key={a.name} value={a.name}>{a.name}</option>
+        ))}
+      </select>
+    </Field>
   );
 }
 

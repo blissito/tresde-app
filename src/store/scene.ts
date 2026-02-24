@@ -59,6 +59,7 @@ export interface SceneObject {
   hoverColor?: string;
   textureUrl?: string;
   glbUrl?: string;
+  glbAnimation?: string;
   orbitRadius?: number;
   orbitSpeed?: number;
 }
