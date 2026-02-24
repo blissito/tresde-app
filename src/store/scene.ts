@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import defaultScene from "../templates/default-scene.json";
 
 export type GeometryType =
   | "box"
@@ -124,43 +125,14 @@ const names: Record<GeometryType, string> = {
 };
 
 export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => ({
-  objects: [
-    {
-      id: "obj-0",
-      name: "Texto 3D 0",
-      geometry: "text3d",
-      material: "standard",
-      animation: "float",
-      position: [0, 1.5, 0],
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
-      color: "#a78bfa",
-      metalness: 0.3,
-      roughness: 0.2,
-      text: "Hola Pelusina",
-    },
-    {
-      id: "obj-1",
-      name: "Texto 3D 1",
-      geometry: "text3d",
-      material: "standard",
-      animation: "float",
-      position: [0, 0.5, -2],
-      rotation: [0, 0, 0],
-      scale: [0.8, 0.8, 0.8],
-      color: "#f472b6",
-      metalness: 0.3,
-      roughness: 0.2,
-      text: "A ver, editeme",
-    },
-  ],
+  objects: defaultScene.objects as SceneObject[],
   selectedId: null,
-  environment: "city",
-  bgColor: "#000000",
-  cameraPosition: [5, 4, 5],
-  cameraTarget: [0, 0, 0],
+  environment: defaultScene.environment,
+  bgColor: defaultScene.bgColor,
+  cameraPosition: defaultScene.cameraPosition as [number, number, number],
+  cameraTarget: defaultScene.cameraTarget as [number, number, number],
   transformMode: "translate",
-  slides: [],
+  slides: defaultScene.slides as Slide[],
   activeSlideId: null,
   flyToSlideId: null,
 
