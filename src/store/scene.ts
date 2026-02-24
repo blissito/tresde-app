@@ -173,7 +173,7 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
       material: "standard",
       animation: "none",
       position: position ?? [Math.random() * 2 - 1, 0.5, Math.random() * 2 - 1],
-      rotation: [0, 0, 0],
+      rotation: geometry === "cylinder" ? [Math.PI / 2, 0, 0] : [0, 0, 0],
       scale: [1, 1, 1],
       color: "#8b5cf6",
       metalness: 0.1,
