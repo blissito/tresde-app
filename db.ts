@@ -38,6 +38,10 @@ export function getAllWaitlist(): { id: number; email: string; session_id: strin
   return db.query(`SELECT * FROM waitlist ORDER BY created_at DESC`).all() as any;
 }
 
+export function deleteScene(id: string): void {
+  db.run(`DELETE FROM scenes WHERE id = ?`, [id]);
+}
+
 export function getAllScenes(): SceneRow[] {
   return db.query(`SELECT * FROM scenes ORDER BY updated_at DESC`).all() as SceneRow[];
 }

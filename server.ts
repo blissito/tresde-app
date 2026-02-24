@@ -1,5 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { insertScene, updateScene, getSceneBySession, getScenesBySession, getSceneById, toSlug, insertWaitlist, isSessionRegistered, getAllWaitlist, getAllScenes } from "./db";
+import { insertScene, updateScene, getSceneBySession, getScenesBySession, getSceneById, toSlug, insertWaitlist, isSessionRegistered, getAllWaitlist, getAllScenes, deleteScene } from "./db";
 import { join } from "path";
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -110,6 +110,23 @@ Bun.serve({
       return withSession(Response.json({ registered }), sessionId, isNew);
     }
 
+    // DELETE /api/admin/scenes/:id
+    const deleteMatch = url.pathname.match(/^\/api\/admin\/scenes\/([^/]+)$/);
+    if (deleteMatch && req.method === "DELETE") {
+      if (url.searchParams.get("key") !== process.env.ADMIN_KEY) {
+        return new Response("No autorizado", { status: 401 });
+      }
+      const scene = getSceneById(deleteMatch[1]);
+      if (scene) {
+        try {
+          const s3Key = new URL(scene.s3_url).pathname.slice(1);
+          await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: s3Key, Body: "", ContentType: "text/html" }));
+        } catch {}
+        deleteScene(scene.id);
+      }
+      return Response.json({ ok: true });
+    }
+
     // GET /admin/
     if (url.pathname === "/admin" || url.pathname === "/admin/") {
       if (url.searchParams.get("key") !== process.env.ADMIN_KEY) {
@@ -129,10 +146,12 @@ Bun.serve({
         <tr class="${i % 2 === 0 ? 'bg-zinc-900/50' : ''}">
           <td class="px-4 py-3 text-white">${s.title || s.id}</td>
           <td class="px-4 py-3 text-zinc-500 text-sm font-mono">${s.session_id?.slice(0, 8)}…</td>
-          <td class="px-4 py-3 text-sm">
+          <td class="px-4 py-3 text-sm flex items-center gap-2">
             <a href="${s.s3_url}" target="_blank" class="text-violet-400 hover:text-violet-300">Ver live</a>
-            <span class="text-zinc-700 mx-1">·</span>
-            <a href="/?import=${s.id}" target="_blank" class="text-emerald-400 hover:text-emerald-300">Abrir en editor</a>
+            <span class="text-zinc-700">·</span>
+            <a href="/?import=${s.id}" target="_blank" class="text-emerald-400 hover:text-emerald-300">Editor</a>
+            <span class="text-zinc-700">·</span>
+            <button onclick="if(confirm('Borrar ${s.title || s.id}?')){fetch('/api/admin/scenes/${s.id}?key='+new URLSearchParams(location.search).get('key'),{method:'DELETE'}).then(()=>location.reload())}" class="text-red-400 hover:text-red-300">Borrar</button>
           </td>
           <td class="px-4 py-3 text-zinc-400 text-sm">${new Date(s.updated_at + 'Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
         </tr>`).join('');
