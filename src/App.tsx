@@ -88,7 +88,7 @@ function EditorView() {
         loadScene(data);
         window.history.replaceState({}, "", "/");
       })
-      .catch((e) => console.error("Failed to import scene:", e));
+      .catch((e) => toast.error("No se pudo importar la escena"));
   }, [loadScene]);
 
   useEffect(() => {
