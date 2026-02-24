@@ -56,6 +56,7 @@ src/
 - [ ] Transiciones de cámara entre slides (lerp suave) — **TODO: flyTo/slides broken, camera save/restore needs debugging**
 - [ ] Transiciones de objetos entre slides (aparecer, desaparecer, mover, escalar)
 - [ ] Text overlays por slide (título, subtítulo, párrafo) con posición 2D configurable
+- [ ] Interacciones por objeto: animaciones detonadas por click, hover y drag (explotar, desarmar, rotar, escalar, cambiar material, etc.)
 - [ ] Preview con scroll funcional (botón Play ya existe)
 - [ ] Texto fijo HTML overlay (títulos grandes legibles) + objeto 3D como ilustración con interacción hover (desarmar, explotar, transformar). Estilo Spline hero sections.
 

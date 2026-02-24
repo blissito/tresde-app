@@ -1,4 +1,4 @@
-import { Canvas3D, scrollOffsetRef } from "./components/Canvas3D";
+import { Canvas3D, scrollOffsetRef, cameraStateRef } from "./components/Canvas3D";
 import { Sidebar } from "./components/Sidebar";
 import { PropsPanel } from "./components/PropsPanel";
 import { CodePreview } from "./components/CodePreview";
@@ -135,7 +135,12 @@ function EditorView() {
         <Canvas3D />
         <div className="absolute top-4 right-4 flex gap-2">
           <button
-            onClick={() => { scrollOffsetRef.current = 0; setPreview(true); }}
+            onClick={() => {
+              const cam = cameraStateRef.current;
+              useSceneStore.getState().setCameraState(cam.position, cam.target);
+              scrollOffsetRef.current = 0;
+              setPreview(true);
+            }}
             className="bg-violet-600 hover:bg-violet-500 text-sm px-3 py-1.5 rounded-lg border border-violet-500 font-medium"
           >
             ▶ Play
@@ -151,6 +156,8 @@ function EditorView() {
             onClick={async () => {
               setExporting(true);
               try {
+                const cam = cameraStateRef.current;
+                useSceneStore.getState().setCameraState(cam.position, cam.target);
                 const s = useSceneStore.getState();
                 const html = await generateHTML({
                   objects: s.objects,
@@ -177,6 +184,8 @@ function EditorView() {
             onClick={async () => {
               setPublishing(true);
               try {
+                const cam = cameraStateRef.current;
+                useSceneStore.getState().setCameraState(cam.position, cam.target);
                 const s = useSceneStore.getState();
                 const sceneState = {
                   objects: s.objects,

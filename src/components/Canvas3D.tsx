@@ -332,7 +332,7 @@ export function Canvas3D({ embed, preserveCamera, onSlideChange }: { embed?: boo
         shadows
         camera={{
           position: (embed && !preserveCamera) ? [0, 0.5, 8] : savedCameraPos,
-          fov: embed ? 60 : 50,
+          fov: (embed && !preserveCamera) ? 60 : 50,
         }}
         onPointerMissed={() => !embed && selectObject(null)}
         className="!absolute inset-0"
