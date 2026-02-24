@@ -68,6 +68,7 @@ function EditorView() {
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [showWaitlist, setShowWaitlist] = useState(false);
   const selectedId = useSceneStore((s) => s.selectedId);
   const slides = useSceneStore((s) => s.slides);
@@ -88,6 +89,15 @@ function EditorView() {
       })
       .catch((e) => console.error("Failed to import scene:", e));
   }, [loadScene]);
+
+  useEffect(() => {
+    fetch("/api/scenes")
+      .then((r) => r.json())
+      .then((scenes: { url: string }[]) => {
+        if (scenes.length > 0) setPublishedUrl(scenes[0].url);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/waitlist/status")
@@ -169,6 +179,7 @@ function EditorView() {
                 };
                 const html = await generateHTML(sceneState);
                 const { url } = await publishScene(html, sceneState);
+                setPublishedUrl(url);
                 await navigator.clipboard.writeText(url);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 3000);
@@ -178,9 +189,13 @@ function EditorView() {
                 setPublishing(false);
               }
             }}
-            className="bg-zinc-800 hover:bg-zinc-700 text-sm px-3 py-1.5 rounded-lg border border-zinc-700 disabled:opacity-50"
+            className={`text-sm px-3 py-1.5 rounded-lg border font-medium disabled:opacity-50 ${
+              publishedUrl
+                ? "bg-emerald-600 hover:bg-emerald-500 border-emerald-500"
+                : "bg-violet-600 hover:bg-violet-500 border-violet-500"
+            }`}
           >
-            {publishing ? "Publicando..." : copied ? "✓ Copiado!" : "Compartir"}
+            {publishing ? "Publicando..." : copied ? "✓ Copiado!" : publishedUrl ? "Publicado" : "Publicar"}
           </button>
         </div>
         {showCode && <CodePreview onClose={() => setShowCode(false)} />}
