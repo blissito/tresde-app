@@ -9,7 +9,8 @@ export type GeometryType =
   | "roundedBox"
   | "dodecahedron"
   | "text3d"
-  | "cylinder";
+  | "cylinder"
+  | "glb";
 
 export type MaterialType =
   | "standard"
@@ -57,6 +58,7 @@ export interface SceneObject {
   hoverScale?: [number, number, number];
   hoverColor?: string;
   textureUrl?: string;
+  glbUrl?: string;
   orbitRadius?: number;
   orbitSpeed?: number;
 }
@@ -74,7 +76,7 @@ interface SceneState {
   slides: Slide[];
   activeSlideId: string | null;
   flyToSlideId: string | null;
-  addObject: (geometry: GeometryType, position?: [number, number, number]) => void;
+  addObject: (geometry: GeometryType, position?: [number, number, number], opts?: { glbUrl?: string; name?: string }) => void;
   duplicateObject: (id: string) => void;
   removeObject: (id: string) => void;
   selectObject: (id: string | null) => void;
@@ -98,6 +100,11 @@ interface SceneState {
 
 let counter = 0;
 let slideCounter = 0;
+
+// If importing a scene, clear persisted state so it doesn't override the import
+if (new URLSearchParams(window.location.search).has("import")) {
+  localStorage.removeItem("tresde-scene");
+}
 
 // Restore counters from persisted state to avoid ID collisions after reload
 try {
@@ -124,6 +131,7 @@ const names: Record<GeometryType, string> = {
   dodecahedron: "Dodecaedro",
   text3d: "Texto 3D",
   cylinder: "Moneda",
+  glb: "GLB",
 };
 
 export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => ({
@@ -138,11 +146,11 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
   activeSlideId: null,
   flyToSlideId: null,
 
-  addObject: (geometry, position?) => {
+  addObject: (geometry, position?, opts?) => {
     const id = `obj-${++counter}`;
     const obj: SceneObject = {
       id,
-      name: `${names[geometry]} ${counter}`,
+      name: opts?.name ?? `${names[geometry]} ${counter}`,
       geometry,
       material: "standard",
       animation: "none",
@@ -157,6 +165,7 @@ export const useSceneStore = create<SceneState>()(persist<SceneState>((set) => (
       distort: 0.4,
       speed: 2,
       text: "Hola",
+      glbUrl: opts?.glbUrl,
     };
     set((s) => ({ objects: [...s.objects, obj], selectedId: id }));
   },

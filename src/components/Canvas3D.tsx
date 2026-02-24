@@ -239,7 +239,7 @@ export function Canvas3D({ embed, preserveCamera, onSlideChange }: { embed?: boo
   const [dragOver, setDragOver] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes("application/tresde-geometry")) {
+    if (e.dataTransfer.types.includes("application/tresde-geometry") || e.dataTransfer.types.includes("application/tresde-glb")) {
       e.preventDefault();
       e.dataTransfer.dropEffect = "copy";
       setDragOver(true);
@@ -255,12 +255,15 @@ export function Canvas3D({ embed, preserveCamera, onSlideChange }: { embed?: boo
       e.preventDefault();
       setDragOver(false);
 
-      const geometry = e.dataTransfer.getData("application/tresde-geometry") as GeometryType;
+      const glbUrl = e.dataTransfer.getData("application/tresde-glb");
+      const glbName = e.dataTransfer.getData("application/tresde-glb-name");
+      const geometry = (glbUrl ? "glb" : e.dataTransfer.getData("application/tresde-geometry")) as GeometryType;
       if (!geometry) return;
+      const glbOpts = glbUrl ? { glbUrl, name: glbName || "GLB" } : undefined;
 
       const canvas = canvasRef.current;
       if (!canvas) {
-        addObject(geometry);
+        addObject(geometry, undefined, glbOpts);
         return;
       }
 
@@ -272,7 +275,7 @@ export function Canvas3D({ embed, preserveCamera, onSlideChange }: { embed?: boo
       const raycaster = new THREE.Raycaster();
       const camera = (canvas as any).__r3f?.store?.getState()?.camera;
       if (!camera) {
-        addObject(geometry);
+        addObject(geometry, undefined, glbOpts);
         return;
       }
 
@@ -286,9 +289,9 @@ export function Canvas3D({ embed, preserveCamera, onSlideChange }: { embed?: boo
           Math.round(intersection.x * 2) / 2,
           0.5,
           Math.round(intersection.z * 2) / 2,
-        ]);
+        ], glbOpts);
       } else {
-        addObject(geometry);
+        addObject(geometry, undefined, glbOpts);
       }
     },
     [addObject]

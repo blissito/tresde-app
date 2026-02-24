@@ -56,7 +56,7 @@ function EmbedApp() {
       <Canvas3D embed onSlideChange={setCurrentSlide} />
       {slides.length >= 2 && <SlideTextOverlay slideIndex={currentSlide} />}
       <a
-        href="https://tresde.app"
+        href="https://tresde-app.fly.dev"
         target="_blank"
         rel="noopener noreferrer"
         className="absolute bottom-3 right-3 text-white/40 text-xs hover:text-white/70 transition-colors z-20"

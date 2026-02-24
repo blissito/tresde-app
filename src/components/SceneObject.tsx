@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
   TransformControls,
@@ -11,9 +11,13 @@ import {
   Text3D,
   Center,
   useTexture,
+  useGLTF,
 } from "@react-three/drei";
+import { useLoader } from "@react-three/fiber";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { useSceneStore, type SceneObject as SceneObjectType } from "../store/scene";
 import * as THREE from "three";
+import { clone as cloneWithSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 const _targetRotX = { current: 0 };
 const _targetRotY = { current: 0 };
@@ -118,6 +122,37 @@ function OrbitWrapper({ obj, children }: { obj: SceneObjectType; children: React
   return <group ref={orbitRef}>{children}</group>;
 }
 
+function GlbModel({ url }: { url: string }) {
+  const { scene } = useGLTF(url);
+  const cloned = useMemo(() => {
+    const c = cloneWithSkeleton(scene);
+    // Reset root transform so it follows parent group
+    c.position.set(0, 0, 0);
+    c.rotation.set(0, 0, 0);
+    c.scale.set(1, 1, 1);
+    return c;
+  }, [scene]);
+  return <primitive object={cloned} />;
+}
+
+function ObjModel({ url }: { url: string }) {
+  const obj = useLoader(OBJLoader, url);
+  const cloned = useMemo(() => {
+    const c = obj.clone();
+    c.position.set(0, 0, 0);
+    c.rotation.set(0, 0, 0);
+    c.scale.set(1, 1, 1);
+    return c;
+  }, [obj]);
+  return <primitive object={cloned} />;
+}
+
+function ModelComponent({ url }: { url: string }) {
+  const ext = url.split(".").pop()?.toLowerCase().split("?")[0];
+  if (ext === "obj") return <ObjModel url={url} />;
+  return <GlbModel url={url} />;
+}
+
 function ObjectMesh({ obj, materialRef }: { obj: SceneObjectType; materialRef?: React.RefObject<THREE.Material | null> }) {
   const ref = useRef<THREE.Mesh>(null!);
 
@@ -126,6 +161,14 @@ function ObjectMesh({ obj, materialRef }: { obj: SceneObjectType; materialRef?: 
       ref.current.rotation.y += delta * 0.5;
     }
   });
+
+  if (obj.geometry === "glb" && obj.glbUrl) {
+    return (
+      <group ref={ref as any}>
+        <ModelComponent url={obj.glbUrl} />
+      </group>
+    );
+  }
 
   if (obj.geometry === "roundedBox") {
     return (

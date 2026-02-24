@@ -3,6 +3,15 @@ import { cameraStateRef } from "./Canvas3D";
 import { glassHeroTemplate } from "../templates/glass-hero";
 import { epicHeroTemplate, epicHeroEnvironment } from "../templates/epic-hero";
 
+// Auto-discover 3D model files from public/assets/glbs/
+const modelFiles = Object.keys(
+  import.meta.glob("/public/assets/glbs/*.{glb,obj}", { eager: false })
+).map((path) => {
+  const filename = path.split("/").pop()!;
+  const name = filename.replace(/\.(glb|obj)$/i, "");
+  return { name, url: `/assets/glbs/${filename}` };
+});
+
 const primitives: { type: GeometryType; label: string; icon: string }[] = [
   { type: "box", label: "Cubo", icon: "□" },
   { type: "sphere", label: "Esfera", icon: "○" },
@@ -72,6 +81,31 @@ export function Sidebar() {
           ))}
         </div>
       </div>
+
+      {/* Modelos 3D */}
+      {modelFiles.length > 0 && (
+        <div className="p-3 border-b border-zinc-800">
+          <h3 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">Modelos 3D</h3>
+          <div className="space-y-0.5">
+            {modelFiles.map((glb) => (
+              <button
+                key={glb.url}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/tresde-glb", glb.url);
+                  e.dataTransfer.setData("application/tresde-glb-name", glb.name);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={() => addObject("glb", undefined, { glbUrl: glb.url, name: glb.name })}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-grab active:cursor-grabbing text-left"
+              >
+                <span className="text-sm">📦</span>
+                <span className="text-xs truncate">{glb.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Transform mode */}
       <div className="p-3 border-b border-zinc-800">
