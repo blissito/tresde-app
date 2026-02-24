@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { insertScene, updateScene, getSceneBySession, getScenesBySession, getSceneById, toSlug, insertWaitlist, isSessionRegistered, getAllWaitlist } from "./db";
 import { join } from "path";
 
@@ -62,6 +62,11 @@ Bun.serve({
       const s3Url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
 
       if (existing) {
+        // Delete old S3 object
+        try {
+          const oldKey = new URL(existing.s3_url).pathname.slice(1);
+          await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: oldKey }));
+        } catch {}
         updateScene(existing.id, title || null, s3Url, JSON.stringify(sceneData));
       } else {
         insertScene(slug, sessionId, title || null, s3Url, JSON.stringify(sceneData));
