@@ -8,6 +8,7 @@ import { epicHeroTemplate, epicHeroEnvironment } from "./templates/epic-hero";
 import { decodeScene } from "./lib/share";
 import { generateHTML, downloadHTML, publishScene } from "./lib/exportHTML";
 import { WaitlistModal } from "./components/WaitlistModal";
+import toast, { Toaster } from "react-hot-toast";
 
 function SlideTextOverlay({ slideIndex }: { slideIndex: number }) {
   const slides = useSceneStore((s) => s.slides);
@@ -160,6 +161,9 @@ function EditorView() {
                   cameraTarget: s.cameraTarget,
                 });
                 downloadHTML(html);
+                toast.success("HTML descargado");
+              } catch (e) {
+                toast.error("Error al exportar: " + (e instanceof Error ? e.message : e));
               } finally {
                 setExporting(false);
               }
@@ -189,8 +193,10 @@ function EditorView() {
                 await navigator.clipboard.writeText(url);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 3000);
+                toast.success("Publicado — URL copiada al portapapeles");
               } catch (e) {
                 console.error("Publish failed:", e);
+                toast.error("Error al publicar: " + (e instanceof Error ? e.message : e));
               } finally {
                 setPublishing(false);
               }
@@ -209,6 +215,7 @@ function EditorView() {
       {selectedId && <PropsPanel />}
 
       {showWaitlist && <WaitlistModal onClose={() => setShowWaitlist(false)} />}
+      <Toaster position="bottom-right" toastOptions={{ style: { background: '#18181b', color: '#fff', border: '1px solid #3f3f46' } }} />
 
       {/* Preview overlay */}
       {preview && (
