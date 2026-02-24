@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 
-const DB_PATH = process.env.DB_PATH || "./data/tresde.db";
+const DB_PATH = process.env.DB_PATH || "/data/tresde.db";
 
 const db = new Database(DB_PATH, { create: true });
 
