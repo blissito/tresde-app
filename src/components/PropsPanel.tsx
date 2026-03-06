@@ -27,7 +27,7 @@ export function PropsPanel() {
     updateObject(obj.id, updates);
 
   return (
-    <div className="w-64 bg-zinc-900 border-l border-zinc-800 overflow-y-auto p-3 space-y-4">
+    <div className="w-64 bg-zinc-900 border-l border-zinc-800 h-full overflow-y-auto p-3 space-y-4">
       <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
         {obj.name}
       </h3>

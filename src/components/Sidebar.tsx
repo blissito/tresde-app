@@ -90,7 +90,7 @@ export function Sidebar() {
   const flyToSlide = useSceneStore((s) => s.flyToSlide);
 
   return (
-    <div className="w-56 bg-zinc-900 border-r border-zinc-800 flex flex-col h-full overflow-hidden">
+    <div className="w-56 bg-zinc-900 border-r border-zinc-800 flex flex-col h-full overflow-y-auto">
       {/* Primitivas */}
       <div className="p-3 border-b border-zinc-800">
         <h3 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">Agregar</h3>
